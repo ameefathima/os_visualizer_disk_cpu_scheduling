@@ -1,0 +1,2490 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>OS Scheduling Visualizer — Blush Sand Open Learning Lab</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'system-ui', '-apple-system', 'Segoe UI', 'Roboto', 'sans-serif'],
+            mono: ['JetBrains Mono', 'ui-monospace', 'SFMono-Regular', 'Menlo', 'Monaco', 'Consolas', 'monospace'],
+          },
+          colors: {
+            blush: {
+              bg: '#fff6f0',
+              panel: 'rgba(255,255,255,0.96)',
+              soft: '#fff0e8',
+              tint: '#ffe5dc',
+              border: '#f0cfc5',
+              line: '#f2d7ce',
+              ink: '#482d32',
+              heading: '#873d49',
+              subhead: '#9b4d55',
+              muted: '#815f62',
+              coral: '#d96f76',
+              salmon: '#e8877d',
+              crimson: '#c85c66',
+              deep: '#b9475a',
+            }
+          }
+        }
+      }
+    };
+  </script>
+  <style>
+    :root {
+      --bg: #fff6f0;
+      --panel: rgba(255, 255, 255, 0.96);
+      --panel2: #fff0e8;
+      --line: #f2d7ce;
+      --text: #482d32;
+      --muted: #815f62;
+      --coral: #d96f76;
+      --salmon: #e8877d;
+      --crimson: #c85c66;
+      --deep: #b9475a;
+      --heading: #873d49;
+      --subhead: #9b4d55;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      color: var(--text);
+      font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
+      background:
+        radial-gradient(circle at 12% 8%, #ffe2d6 0 10%, transparent 10.2%),
+        radial-gradient(circle at 92% 92%, #ffe9dc 0 11%, transparent 11.2%),
+        linear-gradient(135deg, #fff8f4, #fff0ec 52%, #fff7f0);
+      min-height: 100vh;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    .blush-panel {
+      background: var(--panel);
+      border: 1px solid #f0cfc5;
+      border-radius: 16px;
+      box-shadow: 0 12px 32px rgba(145, 73, 73, 0.08);
+      backdrop-filter: blur(5px);
+    }
+
+    .blush-heading {
+      font-weight: 900;
+      letter-spacing: -0.02em;
+      color: #873d49;
+    }
+
+    .blush-subhead {
+      font-weight: 800;
+      letter-spacing: -0.01em;
+      color: #9b4d55;
+    }
+
+    .blush-input {
+      background: #fffaf7;
+      border: 1px solid #edcfc6;
+      color: #482d32;
+      border-radius: 10px;
+      transition: all 0.16s ease;
+    }
+    .blush-input:focus {
+      outline: none;
+      border-color: #d96f76;
+      box-shadow: 0 0 0 3px rgba(217, 111, 118, 0.18);
+      background: #ffffff;
+    }
+
+    .btn-blush {
+      background: #fff0e9;
+      border: 1px solid #efcfc4;
+      color: #683d43;
+      border-radius: 10px;
+      font-weight: 700;
+      transition: all 0.15s ease;
+    }
+    .btn-blush:hover:not(:disabled) {
+      background: #ffe3d7;
+      border-color: #e5b7ab;
+      color: #873d49;
+    }
+    .btn-blush:disabled {
+      opacity: 0.42;
+      cursor: not-allowed;
+    }
+
+    .btn-primary-coral {
+      background: #d96f76;
+      border: 1px solid #c85c66;
+      color: #ffffff;
+      border-radius: 10px;
+      font-weight: 700;
+      box-shadow: 0 4px 12px rgba(200, 92, 102, 0.22);
+      transition: all 0.15s ease;
+    }
+    .btn-primary-coral:hover:not(:disabled) {
+      background: #c85c66;
+    }
+    .btn-primary-coral:disabled {
+      opacity: 0.45;
+      cursor: not-allowed;
+    }
+
+    /* Status progress bar in Process Status Table */
+    .statusbar {
+      height: 16px;
+      min-width: 96px;
+      background: #f7e2dc;
+      border-radius: 7px;
+      overflow: hidden;
+      border: 1px solid #f0cfc5;
+    }
+    .statusfill {
+      height: 100%;
+      background: #e8877d;
+      width: 0%;
+      transition: width 0.22s ease;
+      border-radius: 6px;
+    }
+    .statusfill.current {
+      background: #c85c66;
+    }
+
+    /* Ready queue items matching uploaded Round Robin Studio */
+    .qitem {
+      padding: 8px 12px;
+      background: #ffe8df;
+      border: 1px solid #efc0b6;
+      border-radius: 9px;
+      color: #874650;
+      font-weight: 800;
+      font-size: 13px;
+      transition: all 0.18s ease;
+    }
+    .qitem:first-child {
+      border-color: #d96f76;
+      box-shadow: 0 0 0 2px rgba(217, 111, 118, 0.22);
+    }
+
+    /* Gantt segment styling */
+    .gseg {
+      position: relative;
+      min-width: 56px;
+      height: 58px;
+      padding: 8px 10px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      font-weight: 900;
+      border-right: 2px solid #482d32;
+      color: #fff;
+      transition: filter 0.18s ease, transform 0.18s ease;
+    }
+    .gseg.cs {
+      background: #873d49 !important;
+      color: #fff6f0;
+    }
+    .gseg.idle {
+      background: #f0d8d1 !important;
+      color: #704d52;
+    }
+    .gseg.active {
+      outline: 3px solid #ffffff;
+      outline-offset: -4px;
+      filter: brightness(1.12);
+    }
+
+    input[type="range"] {
+      accent-color: #d96f76;
+    }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col">
+
+  <!-- Top Navigation Header -->
+  <header class="bg-white/95 backdrop-blur border-b border-[#f0cfc5] sticky top-0 z-30 shadow-sm">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3.5 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-xl bg-[#d96f76] border border-[#c85c66] text-white flex items-center justify-center shadow-sm shrink-0">
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
+            <rect x="3" y="4" width="18" height="16" rx="2.5" />
+            <path d="M7 9h10M7 13h6M7 17h8" stroke-linecap="round" />
+          </svg>
+        </div>
+        <div>
+          <div class="flex items-center gap-2 flex-wrap">
+            <h1 class="text-lg sm:text-xl blush-heading">OS Scheduling Visualizer</h1>
+            <span class="text-xs font-extrabold px-2.5 py-0.5 rounded-lg bg-[#ffe5dc] text-[#873d49] border border-[#f1c9bd]">Blush Sand Open Lab</span>
+          </div>
+          <p class="text-xs sm:text-sm text-[#815f62] font-medium">Interactive step-by-step playground for Disk &amp; CPU scheduling algorithms</p>
+        </div>
+      </div>
+
+      <!-- Primary Mode Switcher Tabs -->
+      <nav class="flex items-center bg-[#fff0e8] p-1.5 rounded-xl border border-[#f0cfc5] self-start md:self-auto w-full md:w-auto" aria-label="Primary Sections">
+        <button id="tab-disk" onclick="switchMainTab('disk')" class="flex-1 md:flex-initial px-4 py-2 rounded-lg text-sm font-extrabold bg-[#d96f76] text-white shadow-sm flex items-center justify-center gap-2 transition">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
+            <circle cx="12" cy="12" r="9" />
+            <circle cx="12" cy="12" r="3" />
+          </svg>
+          <span>Part A: Disk Scheduling</span>
+        </button>
+        <button id="tab-cpu" onclick="switchMainTab('cpu')" class="flex-1 md:flex-initial px-4 py-2 rounded-lg text-sm font-bold text-[#683d43] hover:text-[#873d49] flex items-center justify-center gap-2 transition">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
+            <rect x="4" y="4" width="16" height="16" rx="2" />
+            <path d="M9 9h6v6H9zM9 1v3M15 1v3M9 20v3M15 20v3M20 9h3M20 14h3M1 9h3M1 14h3" />
+          </svg>
+          <span>Part B: CPU Scheduling</span>
+        </button>
+      </nav>
+    </div>
+  </header>
+
+  <!-- Inline Notification Banner -->
+  <div id="toast-banner" class="hidden max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 mt-3">
+    <div id="toast-content" class="rounded-xl px-4 py-3 text-sm font-semibold flex items-center justify-between border"></div>
+  </div>
+
+  <!-- Main Content Container -->
+  <main class="flex-1 max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-6">
+
+    <!-- =================================================================== -->
+    <!-- PART A: DISK SCHEDULING SECTION (FCFS, SSTF, SCAN, C-SCAN, LOOK, C-LOOK) -->
+    <!-- =================================================================== -->
+    <section id="section-disk" class="space-y-6">
+
+      <!-- Top Control & Input Configuration Card -->
+      <div class="blush-panel p-4 sm:p-6">
+        <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3 pb-4 border-b border-[#f2d7ce]">
+          <div>
+            <h2 class="text-base sm:text-lg blush-subhead">Disk I/O Request Parameters</h2>
+            <p class="text-xs sm:text-sm text-[#815f62]">Configure disk cylinder count, initial read/write head position, head direction, and request queue.</p>
+          </div>
+          <!-- Preset Scenarios -->
+          <div class="flex flex-wrap items-center gap-2">
+            <span class="text-xs font-extrabold uppercase tracking-wider text-[#9b4d55] mr-1">Presets:</span>
+            <button onclick="applyDiskPreset('sample')" class="btn-primary-coral px-3 py-1.5 text-xs">Sample Test Input (0–199, Head 50)</button>
+            <button onclick="applyDiskPreset('textbook')" class="btn-blush px-3 py-1.5 text-xs">Textbook (Head 53)</button>
+            <button onclick="applyDiskPreset('clustered')" class="btn-blush px-3 py-1.5 text-xs">Clustered Tracks</button>
+            <button onclick="applyDiskPreset('edge')" class="btn-blush px-3 py-1.5 text-xs">Edge Heavy</button>
+            <button onclick="randomizeDiskQueue()" class="px-3 py-1.5 text-xs font-extrabold rounded-xl bg-[#ffe5dc] hover:bg-[#ffd5c7] text-[#873d49] border border-[#f1c9bd] transition flex items-center gap-1.5">
+              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              Randomize
+            </button>
+          </div>
+        </div>
+
+        <!-- Input Fields Grid -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-4 pt-4">
+          <!-- Disk Size -->
+          <div class="lg:col-span-2">
+            <label for="disk-size" class="block text-xs font-bold text-[#683d43] mb-1">Disk Size (Cylinders)</label>
+            <input id="disk-size" type="number" min="10" max="2000" value="200" onchange="recomputeDisk()" class="blush-input w-full px-3 py-2 text-sm font-mono font-semibold" />
+            <span class="text-[11px] text-[#815f62]">Cylinders: <strong class="font-mono text-[#873d49]">0–<span id="disk-max-label">199</span></strong></span>
+          </div>
+
+          <!-- Initial Head Position -->
+          <div class="lg:col-span-2">
+            <label for="disk-head" class="block text-xs font-bold text-[#683d43] mb-1">Initial Head Position</label>
+            <input id="disk-head" type="number" min="0" max="1999" value="50" onchange="recomputeDisk()" class="blush-input w-full px-3 py-2 text-sm font-mono font-semibold" />
+            <span class="text-[11px] text-[#815f62]">Starting track (default: 50)</span>
+          </div>
+
+          <!-- Direction (SCAN / C-SCAN / LOOK / C-LOOK) -->
+          <div class="lg:col-span-3">
+            <label class="block text-xs font-bold text-[#683d43] mb-1">Head Direction <span class="font-normal text-[#815f62]">(SCAN/LOOK/C-LOOK)</span></label>
+            <div class="grid grid-cols-2 gap-1.5 bg-[#fff0e8] p-1 rounded-xl border border-[#f0cfc5]">
+              <button id="dir-left" onclick="setDiskDirection('left')" class="px-2.5 py-1.5 rounded-lg text-xs font-bold text-[#683d43] hover:text-[#873d49] transition flex items-center justify-center gap-1">
+                <span>&larr; Left (0)</span>
+              </button>
+              <button id="dir-right" onclick="setDiskDirection('right')" class="px-2.5 py-1.5 rounded-lg text-xs font-extrabold bg-[#d96f76] text-white shadow-sm transition flex items-center justify-center gap-1">
+                <span>Right (Max) &rarr;</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Request Queue -->
+          <div class="sm:col-span-2 lg:col-span-5">
+            <label for="disk-queue" class="block text-xs font-bold text-[#683d43] mb-1">Cylinder Request Queue <span class="font-normal text-[#815f62]">(comma or space separated)</span></label>
+            <div class="flex gap-2">
+              <input id="disk-queue" type="text" value="82, 170, 43, 140, 24, 16, 190" onchange="recomputeDisk()" class="blush-input w-full px-3 py-2 text-sm font-mono font-semibold" placeholder="e.g., 82, 170, 43, 140, 24, 16, 190" />
+              <button onclick="recomputeDisk()" class="btn-primary-coral px-4 py-2 text-sm shrink-0">
+                Simulate
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Algorithm Selector & Interactive Playback Bar -->
+      <div class="blush-panel p-4 sm:p-5 flex flex-col xl:flex-row xl:items-center xl:justify-between gap-4">
+        <!-- All 6 Disk Algorithm Pills -->
+        <div class="flex flex-wrap items-center gap-1.5">
+          <span class="text-xs font-extrabold uppercase tracking-wider text-[#9b4d55] mr-1.5">Algorithm:</span>
+          <button onclick="selectDiskAlgo('FCFS')" data-disk-algo="FCFS" class="disk-algo-btn px-3.5 py-2 rounded-xl text-xs sm:text-sm font-extrabold bg-[#d96f76] text-white shadow-sm transition">FCFS</button>
+          <button onclick="selectDiskAlgo('SSTF')" data-disk-algo="SSTF" class="disk-algo-btn px-3.5 py-2 rounded-xl text-xs sm:text-sm font-bold bg-[#fff0e8] text-[#683d43] border border-[#efcfc4] hover:bg-[#ffe3d7] transition">SSTF</button>
+          <button onclick="selectDiskAlgo('SCAN')" data-disk-algo="SCAN" class="disk-algo-btn px-3.5 py-2 rounded-xl text-xs sm:text-sm font-bold bg-[#fff0e8] text-[#683d43] border border-[#efcfc4] hover:bg-[#ffe3d7] transition">SCAN</button>
+          <button onclick="selectDiskAlgo('C-SCAN')" data-disk-algo="C-SCAN" class="disk-algo-btn px-3.5 py-2 rounded-xl text-xs sm:text-sm font-bold bg-[#fff0e8] text-[#683d43] border border-[#efcfc4] hover:bg-[#ffe3d7] transition">C-SCAN</button>
+          <button onclick="selectDiskAlgo('LOOK')" data-disk-algo="LOOK" class="disk-algo-btn px-3.5 py-2 rounded-xl text-xs sm:text-sm font-bold bg-[#fff0e8] text-[#683d43] border border-[#efcfc4] hover:bg-[#ffe3d7] transition">LOOK</button>
+          <button onclick="selectDiskAlgo('C-LOOK')" data-disk-algo="C-LOOK" class="disk-algo-btn px-3.5 py-2 rounded-xl text-xs sm:text-sm font-bold bg-[#fff0e8] text-[#683d43] border border-[#efcfc4] hover:bg-[#ffe3d7] transition">C-LOOK</button>
+        </div>
+
+        <!-- Playback Controls -->
+        <div class="flex flex-wrap items-center gap-2 sm:gap-3">
+          <div class="flex items-center bg-[#fff0e8] p-1 rounded-xl border border-[#f0cfc5]">
+            <button onclick="diskReset()" title="Reset to Step 0" class="p-2 rounded-lg text-[#683d43] hover:bg-white hover:text-[#873d49] transition">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
+            </button>
+            <button onclick="diskStepBack()" title="Previous Step" class="p-2 rounded-lg text-[#683d43] hover:bg-white hover:text-[#873d49] transition">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path d="M15 19l-7-7 7-7" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </button>
+            <button id="disk-play-btn" onclick="toggleDiskPlay()" class="btn-primary-coral px-3.5 py-1.5 rounded-lg text-xs flex items-center gap-1.5">
+              <svg id="disk-play-icon" class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+              <span id="disk-play-text">Play</span>
+            </button>
+            <button onclick="diskStepForward()" title="Next Step" class="p-2 rounded-lg text-[#683d43] hover:bg-white hover:text-[#873d49] transition">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path d="M9 5l7 7-7 7" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </button>
+          </div>
+
+          <div class="flex items-center gap-2 bg-[#fff9f6] px-3 py-1.5 rounded-xl border border-[#f2ddd6]">
+            <label for="disk-speed" class="text-xs font-bold text-[#683d43]">Speed:</label>
+            <input id="disk-speed" type="range" min="1" max="5" value="3" class="w-20 cursor-pointer" />
+            <span id="disk-speed-label" class="text-xs font-mono font-bold text-[#873d49] w-8">1.0x</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Main Disk Visualization Grid: Seek Graph + Live Narration & Stats -->
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+
+        <!-- Left 8 Cols: Animated Seek Graph -->
+        <div class="lg:col-span-8 blush-panel p-4 sm:p-6 flex flex-col">
+          <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-3">
+            <div>
+              <h3 class="text-base blush-subhead flex items-center gap-2">
+                <span id="disk-graph-title">FCFS — Disk Arm Seek Graph</span>
+                <span id="disk-step-badge" class="text-xs font-mono px-2.5 py-0.5 rounded-lg bg-[#ffe5dc] text-[#873d49] border border-[#f1c9bd]">Step 0 / 8</span>
+              </h3>
+              <p class="text-xs text-[#815f62]">Horizontal axis: Cylinder number (0 to Max) &bull; Vertical axis: Service step order (top to bottom)</p>
+            </div>
+            <div class="flex items-center gap-3 text-xs text-[#683d43] font-semibold">
+              <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full bg-[#2f855a] inline-block"></span> Start Head</span>
+              <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full bg-[#d96f76] inline-block"></span> Visited</span>
+              <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full bg-[#d97706] inline-block"></span> Boundary / Jump</span>
+            </div>
+          </div>
+
+          <!-- Responsive Canvas Wrapper -->
+          <div id="disk-canvas-container" class="relative w-full bg-[#fffaf7] rounded-xl border border-[#f0cfc5] overflow-hidden" style="min-height: 360px;">
+            <canvas id="disk-canvas" class="block w-full h-full"></canvas>
+          </div>
+
+          <!-- Ordered Service Sequence Strip -->
+          <div class="mt-4 pt-4 border-t border-[#f2d7ce]">
+            <div class="flex items-center justify-between mb-2">
+              <span class="text-xs font-extrabold uppercase tracking-wider text-[#9b4d55]">Head Service Sequence</span>
+              <span class="text-xs text-[#815f62]">Dashed badges indicate boundary / circular jump points</span>
+            </div>
+            <div id="disk-sequence-chips" class="flex flex-wrap items-center gap-1.5 min-h-[34px]"></div>
+          </div>
+        </div>
+
+        <!-- Right 4 Cols: Metrics, Step Narration & Algorithm Guide -->
+        <div class="lg:col-span-4 space-y-6 flex flex-col">
+
+          <!-- Head Movement Summary KPI Card -->
+          <div class="blush-panel p-5">
+            <span class="text-xs font-extrabold uppercase tracking-wider text-[#9b4d55]">Total Head Movement</span>
+            <div class="mt-2 flex items-baseline justify-between">
+              <div>
+                <span id="disk-current-movement" class="text-3xl sm:text-4xl font-black font-mono text-[#c85c66]">0</span>
+                <span class="text-sm font-semibold text-[#815f62] ml-1">cylinders</span>
+              </div>
+              <div class="text-right">
+                <div class="text-xs text-[#815f62]">Final Total</div>
+                <div id="disk-total-movement" class="text-base font-extrabold font-mono text-[#482d32]">642</div>
+              </div>
+            </div>
+            <!-- Progress Bar -->
+            <div class="w-full bg-[#f7e2dc] h-2.5 rounded-full mt-3 overflow-hidden border border-[#f0cfc5]">
+              <div id="disk-progress-bar" class="bg-[#d96f76] h-full rounded-full transition-all duration-300" style="width: 0%"></div>
+            </div>
+            <div class="mt-2 flex justify-between text-xs text-[#683d43]">
+              <span>Avg Seek / Request: <strong id="disk-avg-seek" class="font-mono text-[#873d49]">91.7</strong></span>
+              <span>Requests: <strong id="disk-req-count" class="font-mono text-[#873d49]">7</strong></span>
+            </div>
+          </div>
+
+          <!-- Live Step-by-Step Decision Explainer -->
+          <div class="bg-[#fff0e8] rounded-2xl border border-[#efc0b6] p-5 shadow-sm">
+            <div class="flex items-center gap-2 mb-2">
+              <span class="w-6 h-6 rounded-lg bg-[#d96f76] text-white text-xs font-black flex items-center justify-center">?</span>
+              <h4 class="text-sm font-extrabold text-[#873d49]">Step Decision Log</h4>
+            </div>
+            <p id="disk-step-narration" class="text-sm text-[#482d32] leading-relaxed">
+              Press <strong>Play</strong> or <strong>Step Forward</strong> to watch how the disk arm selects the next track.
+            </p>
+            <div id="disk-step-math" class="mt-3 px-3 py-2 rounded-xl bg-white/95 border border-[#f0cfc5] font-mono text-xs font-semibold text-[#683d43]">
+              Seek distance = |next - current|
+            </div>
+          </div>
+
+          <!-- Algorithm Learning Guide Card -->
+          <div class="blush-panel p-5 flex-1">
+            <div class="flex items-center justify-between mb-2">
+              <h4 id="disk-guide-title" class="text-sm font-extrabold text-[#873d49]">How FCFS Works</h4>
+              <span class="text-[11px] font-extrabold px-2 py-0.5 rounded-md bg-[#ffe5dc] text-[#873d49] border border-[#f1c9bd]">Concept Guide</span>
+            </div>
+            <p id="disk-guide-desc" class="text-xs sm:text-sm text-[#683d43] leading-relaxed"></p>
+            <div class="mt-3 pt-3 border-t border-[#f2d7ce] grid grid-cols-2 gap-2 text-xs">
+              <div class="bg-[#f3faf5] border border-[#cde6d4] rounded-xl p-2.5">
+                <span class="font-extrabold text-[#276749] block">Pros</span>
+                <span id="disk-guide-pros" class="text-[#2f855a] text-[11px]"></span>
+              </div>
+              <div class="bg-[#fff5f5] border border-[#f5c6cb] rounded-xl p-2.5">
+                <span class="font-extrabold text-[#9b2c2c] block">Cons</span>
+                <span id="disk-guide-cons" class="text-[#b9475a] text-[11px]"></span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- All-6 Algorithm Comparison Bar Chart & Summary Table -->
+      <div class="blush-panel p-4 sm:p-6">
+        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 pb-4 border-b border-[#f2d7ce]">
+          <div>
+            <h3 class="text-base sm:text-lg blush-subhead">All-6 Algorithm Comparison (Same Input Queue)</h3>
+            <p class="text-xs sm:text-sm text-[#815f62]">Compare total head movement across FCFS, SSTF, SCAN, C-SCAN, LOOK, and C-LOOK. Lower seek distance means higher I/O efficiency.</p>
+          </div>
+          <div id="disk-best-badge" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#ffe5dc] border border-[#f1c9bd] text-[#873d49] text-xs font-extrabold self-start sm:self-auto">
+            <span>Lowest Head Movement: SSTF</span>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 pt-5 items-center">
+          <!-- Bar Chart Canvas -->
+          <div class="lg:col-span-7">
+            <div id="disk-bar-container" class="w-full h-72 bg-[#fffaf7] rounded-xl border border-[#f0cfc5] p-2">
+              <canvas id="disk-bar-canvas" class="w-full h-full block"></canvas>
+            </div>
+          </div>
+
+          <!-- Comparison Table -->
+          <div class="lg:col-span-5 overflow-x-auto">
+            <table class="w-full text-left border-collapse text-xs sm:text-sm">
+              <thead>
+                <tr class="bg-[#ffe7df] border-b-2 border-[#e6a9a1] text-[#713d43] text-xs uppercase">
+                  <th class="py-2.5 px-3 font-black">Algorithm</th>
+                  <th class="py-2.5 px-3 font-black text-right">Total Seek</th>
+                  <th class="py-2.5 px-3 font-black text-right">Avg Seek</th>
+                  <th class="py-2.5 px-3 font-black text-right">Action</th>
+                </tr>
+              </thead>
+              <tbody id="disk-comparison-tbody" class="divide-y divide-[#f5e1db]"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- =================================================================== -->
+    <!-- PART B: CPU SCHEDULING SECTION (FCFS, SJF, SRTF, Priority, RR Studio) -->
+    <!-- =================================================================== -->
+    <section id="section-cpu" class="hidden space-y-6">
+
+      <!-- Top Two-Column Studio Layout matching Uploaded Round Robin Studio -->
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
+
+        <!-- Left 5 Cols: CPU Status, Algorithm & Assignment Workload, Settings, Process Inputs & Playback -->
+        <div class="lg:col-span-5 blush-panel p-5 space-y-4">
+          <div class="flex items-start justify-between gap-3">
+            <div>
+              <h2 id="cpu-studio-title" class="text-xl sm:text-2xl blush-heading">CPU Scheduling Studio</h2>
+              <p class="text-xs sm:text-sm text-[#815f62] font-semibold mt-0.5">A visual playground for CPU scheduling algorithms</p>
+            </div>
+            <span id="cpu-studio-badge" class="px-2.5 py-1 rounded-lg bg-[#ffe5dc] border border-[#f1c9bd] text-xs font-extrabold text-[#873d49] shrink-0">Round Robin</span>
+          </div>
+
+          <!-- Big Live CPU Status & Clock -->
+          <div class="bg-[#fff9f6] border border-[#f2ddd6] rounded-xl p-4">
+            <div class="text-xs font-black tracking-[0.14em] text-[#9b4d55] uppercase">CPU Status</div>
+            <div class="flex items-baseline justify-between gap-3 mt-1">
+              <div id="cpu-big-status" class="text-2xl sm:text-3xl font-black text-[#b9475a]">IDLE</div>
+              <div class="text-right">
+                <span class="text-[11px] text-[#815f62] block">Current time</span>
+                <span class="text-xl font-black font-mono text-[#482d32]"><span id="cpu-clock-display">0</span> ms</span>
+              </div>
+              <div class="text-right">
+                <span class="text-[11px] text-[#815f62] block">Interval</span>
+                <span id="cpu-interval-display" class="text-sm font-extrabold font-mono text-[#873d49]">—</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Algorithm Selector Grid -->
+          <div>
+            <label class="block text-xs font-black uppercase tracking-wider text-[#9b4d55] mb-2">1. Select CPU Scheduling Algorithm</label>
+            <div class="grid grid-cols-2 sm:grid-cols-3 gap-1.5">
+              <button onclick="selectCpuAlgo('RR')" data-cpu-algo="RR" class="cpu-algo-btn px-2.5 py-2 rounded-xl text-xs font-extrabold bg-[#d96f76] text-white shadow-sm transition">Round Robin</button>
+              <button onclick="selectCpuAlgo('FCFS')" data-cpu-algo="FCFS" class="cpu-algo-btn px-2.5 py-2 rounded-xl text-xs font-bold bg-[#fff0e8] text-[#683d43] border border-[#efcfc4] hover:bg-[#ffe3d7] transition">FCFS</button>
+              <button onclick="selectCpuAlgo('SJF')" data-cpu-algo="SJF" class="cpu-algo-btn px-2.5 py-2 rounded-xl text-xs font-bold bg-[#fff0e8] text-[#683d43] border border-[#efcfc4] hover:bg-[#ffe3d7] transition">SJF (Non-Preempt)</button>
+              <button onclick="selectCpuAlgo('SRTF')" data-cpu-algo="SRTF" class="cpu-algo-btn px-2.5 py-2 rounded-xl text-xs font-bold bg-[#fff0e8] text-[#683d43] border border-[#efcfc4] hover:bg-[#ffe3d7] transition">SRTF / SJRF</button>
+              <button onclick="selectCpuAlgo('PRIORITY_NP')" data-cpu-algo="PRIORITY_NP" class="cpu-algo-btn px-2.5 py-2 rounded-xl text-xs font-bold bg-[#fff0e8] text-[#683d43] border border-[#efcfc4] hover:bg-[#ffe3d7] transition">Priority (Non-P)</button>
+              <button onclick="selectCpuAlgo('PRIORITY_P')" data-cpu-algo="PRIORITY_P" class="cpu-algo-btn px-2.5 py-2 rounded-xl text-xs font-bold bg-[#fff0e8] text-[#683d43] border border-[#efcfc4] hover:bg-[#ffe3d7] transition">Priority (Preempt)</button>
+            </div>
+          </div>
+
+          <!-- Assignment Workload / Scenario Selector (from uploaded Round Robin Studio) -->
+          <div>
+            <label for="cpu-scenario" class="block text-xs font-black uppercase tracking-wider text-[#9b4d55] mb-1.5">2. Assignment Workload / Preset</label>
+            <select id="cpu-scenario" onchange="handleCpuScenarioChange()" class="blush-input w-full px-3 py-2 text-xs sm:text-sm font-semibold">
+              <option value="sample">Sample Input — P1(0,5), P2(1,3), P3(2,4), P4(3,2) (No CS Overhead)</option>
+              <option value="a1">Activity 1 — Round Robin without context switching overhead (0 ms)</option>
+              <option value="a2">Activity 2 — Round Robin with 1 ms context switching overhead</option>
+              <option value="priority_demo">Priority &amp; Preemption Lab — Mixed Priorities &amp; Short Jobs</option>
+              <option value="custom">Custom Processes (editable below)</option>
+            </select>
+          </div>
+
+          <!-- Simulation Settings -->
+          <div>
+            <label class="block text-xs font-black uppercase tracking-wider text-[#9b4d55] mb-1.5">3. Simulation Settings</label>
+            <div class="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
+              <div id="rr-quantum-field">
+                <label for="cpu-quantum" class="block text-[11px] font-bold text-[#815f62] mb-1">Time quantum (ms)</label>
+                <input id="cpu-quantum" type="number" min="1" step="1" value="2" onchange="recomputeCpu()" class="blush-input w-full px-2.5 py-1.5 text-sm font-mono font-bold" />
+              </div>
+              <div id="rr-overhead-field">
+                <label for="cpu-overhead" class="block text-[11px] font-bold text-[#815f62] mb-1">CS overhead (ms)</label>
+                <input id="cpu-overhead" type="number" min="0" step="1" value="0" onchange="recomputeCpu()" class="blush-input w-full px-2.5 py-1.5 text-sm font-mono font-bold" />
+              </div>
+              <div id="priority-rule-field" class="hidden">
+                <label for="cpu-priority-rule" class="block text-[11px] font-bold text-[#815f62] mb-1">Priority rule</label>
+                <select id="cpu-priority-rule" onchange="recomputeCpu()" class="blush-input w-full px-2 py-1.5 text-xs font-bold">
+                  <option value="low">Low # = High Prio</option>
+                  <option value="high">High # = High Prio</option>
+                </select>
+              </div>
+              <div>
+                <label for="cpu-speed" class="block text-[11px] font-bold text-[#815f62] mb-1">Playback speed</label>
+                <select id="cpu-speed" class="blush-input w-full px-2.5 py-1.5 text-xs font-bold">
+                  <option value="1100">Slow</option>
+                  <option value="600" selected>Normal</option>
+                  <option value="240">Fast</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <!-- Processes (Arrival / Burst / Priority) -->
+          <div>
+            <div class="flex items-center justify-between mb-1.5">
+              <label class="text-xs font-black uppercase tracking-wider text-[#9b4d55]">4. Processes (AT / BT / Priority)</label>
+              <button onclick="addCpuProcess()" class="btn-blush px-2.5 py-1 text-xs">+ Add process</button>
+            </div>
+            <div id="cpu-process-cards" class="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-64 overflow-y-auto pr-1">
+              <!-- Populated dynamically -->
+            </div>
+          </div>
+
+          <!-- Action & Playback Buttons -->
+          <div class="pt-2 border-t border-[#f2d7ce] space-y-2">
+            <div class="flex flex-wrap gap-2">
+              <button onclick="recomputeCpu()" class="btn-primary-coral px-3.5 py-2 text-xs flex-1">Run / Recalculate</button>
+              <button onclick="cpuReset()" class="btn-blush px-3 py-2 text-xs">Reset</button>
+            </div>
+            <div class="grid grid-cols-3 gap-2">
+              <button id="cpu-prev-btn" onclick="cpuStepBack()" class="btn-blush py-2 text-xs">&larr; Prev ms</button>
+              <button id="cpu-play-btn" onclick="toggleCpuPlay()" class="btn-primary-coral py-2 text-xs flex items-center justify-center gap-1">
+                <span id="cpu-play-text">&#9654; Play</span>
+              </button>
+              <button id="cpu-next-btn" onclick="cpuStepForward()" class="btn-blush py-2 text-xs">Next ms &rarr;</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Right 7 Cols: Live Process Status Table + Gantt Chart + Ready Queue -->
+        <div class="lg:col-span-7 space-y-5">
+
+          <!-- Process Status Table with Progress Bars (from uploaded Round Robin Studio) -->
+          <div class="blush-panel p-5">
+            <div class="flex items-center justify-between mb-3">
+              <div>
+                <h3 class="text-base sm:text-lg blush-subhead">Process Status</h3>
+                <p class="text-xs text-[#815f62]">Live completion progress bars, remaining burst time, waiting time, and completion time</p>
+              </div>
+              <span class="text-xs font-mono font-bold px-2.5 py-1 rounded-lg bg-[#fff0e8] border border-[#f0cfc5] text-[#873d49]">
+                Total: <span id="cpu-total-time-display">0</span> ms
+              </span>
+            </div>
+            <div class="overflow-x-auto">
+              <table class="w-full text-left border-collapse text-xs sm:text-sm min-w-[560px]">
+                <thead>
+                  <tr class="bg-[#ffe7df] border-b-2 border-[#e6a9a1] text-[#713d43] text-xs uppercase">
+                    <th class="py-2.5 px-3 font-black">Process / PID</th>
+                    <th class="py-2.5 px-3 font-black text-center">AT (ms)</th>
+                    <th class="py-2.5 px-3 font-black text-center">Prio</th>
+                    <th class="py-2.5 px-3 font-black text-center">Status Bar</th>
+                    <th class="py-2.5 px-3 font-black text-right">Rem BT</th>
+                    <th class="py-2.5 px-3 font-black text-right">WT</th>
+                    <th class="py-2.5 px-3 font-black text-right">CT</th>
+                  </tr>
+                </thead>
+                <tbody id="cpu-status-tbody" class="divide-y divide-[#f5e1db]"></tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- Animated Gantt Chart Panel -->
+          <div class="blush-panel p-5">
+            <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-3">
+              <div>
+                <h3 id="cpu-gantt-title" class="text-base sm:text-lg blush-subhead">Gantt Chart</h3>
+                <p class="text-xs text-[#815f62]">Execution history with current millisecond highlighted (CS = Context Switch)</p>
+              </div>
+              <span id="cpu-gantt-clock" class="px-3 py-1.5 rounded-xl bg-[#ffe5dc] border border-[#f2c7bc] font-mono text-sm font-extrabold text-[#934c54] self-start sm:self-auto">
+                t = 0 ms
+              </span>
+            </div>
+
+            <div class="overflow-x-auto pb-2">
+              <div class="min-w-max">
+                <div id="cpu-gantt-bars" class="flex items-stretch rounded-xl overflow-hidden border-2 border-[#482d32] bg-[#fffaf7] min-h-[58px]"></div>
+                <div id="cpu-gantt-ticks" class="flex min-w-max mt-1 font-mono text-[11px] text-[#815f62]"></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Live Ready Queue & Scheduler Event Log -->
+          <div class="blush-panel p-5">
+            <div class="flex items-center justify-between mb-1">
+              <h3 class="text-base sm:text-lg blush-subhead">Ready Queue</h3>
+              <span class="text-[11px] font-bold text-[#815f62]">Front of queue is on the left</span>
+            </div>
+            <p class="text-xs text-[#815f62] mb-3">The currently running process is on the CPU and not in the ready queue.</p>
+            <div id="cpu-ready-queue" class="flex flex-wrap items-center gap-2 min-h-[42px] p-2.5 rounded-xl bg-[#fff9f6] border border-[#f2ddd6]">
+              <span class="text-xs text-[#815f62] italic">Ready queue is empty at t = 0 ms.</span>
+            </div>
+            <div class="mt-3 px-3.5 py-2.5 rounded-xl bg-[#fff0e8] border border-[#efc0b6] text-xs sm:text-sm font-semibold text-[#683d43] flex items-center gap-2">
+              <span class="w-5 h-5 rounded-md bg-[#d96f76] text-white text-xs font-black flex items-center justify-center shrink-0">i</span>
+              <span id="cpu-step-narration">Simulation ready. Press Play or Next ms to step through execution.</span>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- Live Statistics Cards (6 KPIs from uploaded Round Robin Studio) -->
+      <div class="blush-panel p-5">
+        <h3 class="text-base sm:text-lg blush-subhead mb-3">Live Statistics</h3>
+        <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+          <div class="bg-[#fff9f6] border border-[#f2ddd6] rounded-xl p-3.5">
+            <span class="text-xs text-[#815f62] block">Average Waiting Time</span>
+            <strong id="cpu-avg-wt" class="text-xl font-black font-mono text-[#873d49] mt-1 block">—</strong>
+          </div>
+          <div class="bg-[#fff9f6] border border-[#f2ddd6] rounded-xl p-3.5">
+            <span class="text-xs text-[#815f62] block">Average Turnaround</span>
+            <strong id="cpu-avg-tat" class="text-xl font-black font-mono text-[#873d49] mt-1 block">—</strong>
+          </div>
+          <div class="bg-[#fff9f6] border border-[#f2ddd6] rounded-xl p-3.5">
+            <span class="text-xs text-[#815f62] block">Average Response Time</span>
+            <strong id="cpu-avg-rt" class="text-xl font-black font-mono text-[#873d49] mt-1 block">—</strong>
+          </div>
+          <div class="bg-[#fff9f6] border border-[#f2ddd6] rounded-xl p-3.5">
+            <span class="text-xs text-[#815f62] block">Completed Processes</span>
+            <strong id="cpu-done-count" class="text-xl font-black font-mono text-[#482d32] mt-1 block">0 / 4</strong>
+          </div>
+          <div class="bg-[#fff9f6] border border-[#f2ddd6] rounded-xl p-3.5">
+            <span class="text-xs text-[#815f62] block">Context Switches</span>
+            <strong id="cpu-switch-count" class="text-xl font-black font-mono text-[#482d32] mt-1 block">0</strong>
+          </div>
+          <div class="bg-[#fff9f6] border border-[#f2ddd6] rounded-xl p-3.5">
+            <span class="text-xs text-[#815f62] block">CPU Efficiency</span>
+            <strong id="cpu-efficiency" class="text-xl font-black font-mono text-[#c85c66] mt-1 block">—</strong>
+          </div>
+        </div>
+      </div>
+
+      <!-- Complete Results Table (All Processes) -->
+      <div class="blush-panel p-5">
+        <div class="mb-3">
+          <h3 class="text-base sm:text-lg blush-subhead">Complete Results Table (All Processes)</h3>
+          <p class="text-xs text-[#815f62]">Final scheduling metrics: Turnaround Time (TAT = CT &minus; AT), Waiting Time (WT = TAT &minus; BT), and Response Time (RT = First CPU &minus; AT).</p>
+        </div>
+        <div class="overflow-x-auto">
+          <table class="w-full text-left border-collapse text-xs sm:text-sm min-w-[760px]">
+            <thead>
+              <tr class="bg-[#ffe7df] border-b-2 border-[#e6a9a1] text-[#713d43] text-xs uppercase">
+                <th class="py-2.5 px-3 font-black">Process Name</th>
+                <th class="py-2.5 px-3 font-black text-center">PID</th>
+                <th class="py-2.5 px-3 font-black text-center">AT (ms)</th>
+                <th class="py-2.5 px-3 font-black text-center">BT (ms)</th>
+                <th class="py-2.5 px-3 font-black text-center">Priority</th>
+                <th class="py-2.5 px-3 font-black text-center">CT (ms)</th>
+                <th class="py-2.5 px-3 font-black text-center">TAT (ms)</th>
+                <th class="py-2.5 px-3 font-black text-center">WT (ms)</th>
+                <th class="py-2.5 px-3 font-black text-center">RT (ms)</th>
+              </tr>
+            </thead>
+            <tbody id="cpu-complete-tbody" class="divide-y divide-[#f5e1db]"></tbody>
+          </table>
+        </div>
+        <p id="cpu-assignment-summary" class="text-xs font-semibold text-[#815f62] mt-3"></p>
+      </div>
+
+      <!-- Assignment Quantum Comparison (Visible in Round Robin mode, matching uploaded Round Robin Studio) -->
+      <div id="cpu-rr-comparison-panel" class="blush-panel p-5">
+        <div class="mb-3">
+          <h3 class="text-base sm:text-lg blush-subhead">Assignment Quantum Comparison (Round Robin)</h3>
+          <p class="text-xs text-[#815f62]">Activity 1 compares quantum 2 ms vs 3 ms (0 ms overhead). Activity 2 compares quantum 2 ms vs 4 ms with 1 ms context-switch overhead.</p>
+        </div>
+        <div class="overflow-x-auto">
+          <table class="w-full text-left border-collapse text-xs sm:text-sm min-w-[680px]">
+            <thead>
+              <tr class="bg-[#ffe7df] border-b-2 border-[#e6a9a1] text-[#713d43] text-xs uppercase">
+                <th class="py-2.5 px-3 font-black text-center">Quantum (ms)</th>
+                <th class="py-2.5 px-3 font-black text-center">Avg WT (ms)</th>
+                <th class="py-2.5 px-3 font-black text-center">Avg TAT (ms)</th>
+                <th class="py-2.5 px-3 font-black text-center">Avg RT (ms)</th>
+                <th class="py-2.5 px-3 font-black text-center">Context Switches</th>
+                <th class="py-2.5 px-3 font-black text-center">Switch Overhead (ms)</th>
+                <th class="py-2.5 px-3 font-black text-center">CPU Efficiency</th>
+              </tr>
+            </thead>
+            <tbody id="cpu-quantum-comparison-tbody" class="divide-y divide-[#f5e1db]"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- All-6 CPU Algorithms Cross-Comparison Table -->
+      <div class="blush-panel p-5">
+        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-3">
+          <div>
+            <h3 class="text-base sm:text-lg blush-subhead">All-Algorithm CPU Comparison (Same Process Workload)</h3>
+            <p class="text-xs text-[#815f62]">Compare FCFS, SJF, SRTF/SJRF, Priority (Non-Preemptive), Priority (Preemptive), and Round Robin side-by-side.</p>
+          </div>
+          <span class="text-xs font-extrabold px-2.5 py-1 rounded-lg bg-[#ffe5dc] text-[#873d49] border border-[#f1c9bd]">Click any row to animate</span>
+        </div>
+        <div class="overflow-x-auto">
+          <table class="w-full text-left border-collapse text-xs sm:text-sm min-w-[680px]">
+            <thead>
+              <tr class="bg-[#ffe7df] border-b-2 border-[#e6a9a1] text-[#713d43] text-xs uppercase">
+                <th class="py-2.5 px-3 font-black">Algorithm</th>
+                <th class="py-2.5 px-3 font-black text-right">Avg WT (ms)</th>
+                <th class="py-2.5 px-3 font-black text-right">Avg TAT (ms)</th>
+                <th class="py-2.5 px-3 font-black text-right">Avg RT (ms)</th>
+                <th class="py-2.5 px-3 font-black text-right">Context Switches</th>
+                <th class="py-2.5 px-3 font-black text-right">Action</th>
+              </tr>
+            </thead>
+            <tbody id="cpu-all-algos-tbody" class="divide-y divide-[#f5e1db]"></tbody>
+          </table>
+        </div>
+      </div>
+
+    </section>
+
+  </main>
+
+  <!-- Educational Footer -->
+  <footer class="bg-white/90 border-t border-[#f0cfc5] mt-10 py-5">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-2 text-xs text-[#815f62] font-semibold">
+      <span>OS Scheduling Visualizer &bull; Open Learning Aid for Operating Systems</span>
+      <span>Part A: FCFS, SSTF, SCAN, C-SCAN, LOOK, C-LOOK &bull; Part B: Round Robin Studio, FCFS, SJF, SRTF, Priority</span>
+    </div>
+  </footer>
+
+  <!-- ===================================================================== -->
+  <!-- JAVASCRIPT LOGIC: DISK & CPU SCHEDULING ENGINES                       -->
+  <!-- ===================================================================== -->
+  <script>
+    // =========================================================================
+    // 1. THEME PALETTES & EDUCATIONAL GUIDES
+    // =========================================================================
+    const BLUSH_PROCESS_COLORS = [
+      { bg: '#d96f76', light: '#ffe5dc', text: '#873d49', border: '#efc0b6' }, // Coral Rose
+      { bg: '#c85c66', light: '#ffdce0', text: '#7a2e38', border: '#e8aeb5' }, // Crimson Blush
+      { bg: '#e0826d', light: '#ffece3', text: '#8f4432', border: '#f2c3b3' }, // Warm Terracotta
+      { bg: '#9b4d55', light: '#f6dfe2', text: '#692d34', border: '#ddb3b8' }, // Deep Mauve
+      { bg: '#d47c8a', light: '#fce6ea', text: '#823946', border: '#ebbcc5' }, // Dusty Pink
+      { bg: '#b86252', light: '#fae5e0', text: '#78362a', border: '#e6bbb2' }, // Clay Rose
+      { bg: '#e39178', light: '#fff0e8', text: '#8c4935', border: '#f2cbbd' }, // Soft Peach
+      { bg: '#873d49', light: '#f2d9dd', text: '#5c232d', border: '#d4a7ae' }, // Plum Berry
+    ];
+
+    const DISK_GUIDES = {
+      'FCFS': {
+        title: 'How FCFS (First-Come, First-Served) Works',
+        desc: 'Services disk I/O requests strictly in the order they arrive in the queue, ignoring how far away the next cylinder is from the current read/write head.',
+        pros: 'Completely fair; zero starvation; simple FIFO queue.',
+        cons: 'Wild back-and-forth head swings cause high total seek time.'
+      },
+      'SSTF': {
+        title: 'How SSTF (Shortest Seek Time First) Works',
+        desc: 'Always picks the pending request closest to the current head position (minimum |next - current|), minimizing immediate seek distance at each step.',
+        pros: 'Substantially lowers total head movement compared to FCFS.',
+        cons: 'Can cause starvation for distant tracks if nearby requests keep arriving.'
+      },
+      'SCAN': {
+        title: 'How SCAN (Elevator Algorithm) Works',
+        desc: 'Sweeps the disk arm in one direction servicing all requests along the way until it reaches the physical end of the disk (cylinder 0 or Max-1), then reverses direction.',
+        pros: 'Bounded waiting time; prevents starvation; high throughput.',
+        cons: 'Travels all the way to the physical disk boundary even if no request is there.'
+      },
+      'C-SCAN': {
+        title: 'How C-SCAN (Circular SCAN) Works',
+        desc: 'Sweeps in one direction to the physical disk end, then immediately jumps back to the opposite end (0 or Max-1) without servicing requests on the return trip, scanning again in the same direction.',
+        pros: 'Provides uniform wait times for tracks near the outer and inner edges.',
+        cons: 'The full-disk return jump adds extra head movement distance.'
+      },
+      'LOOK': {
+        title: 'How LOOK Works',
+        desc: 'An optimized version of SCAN: the arm moves in the chosen direction only as far as the last pending request in that direction, then immediately reverses without touching the physical disk edge.',
+        pros: 'Eliminates wasted travel to empty disk boundaries.',
+        cons: 'Slightly more logic needed to inspect remaining requests ahead.'
+      },
+      'C-LOOK': {
+        title: 'How C-LOOK (Circular LOOK) Works',
+        desc: 'Combines LOOK and C-SCAN: the arm sweeps in one direction only up to the farthest pending request, then jumps directly to the lowest (or highest) pending request on the other side and continues sweeping in the same direction.',
+        pros: 'Combines uniform circular fairness with zero wasted travel to physical disk edges.',
+        cons: 'Still incurs a return jump across active cylinders when wrapping around.'
+      }
+    };
+
+    const CPU_SCENARIOS = {
+      sample: [
+        { id: 'P1', name: 'Process P1', arrival: 0, burst: 5, priority: 2 },
+        { id: 'P2', name: 'Process P2', arrival: 1, burst: 3, priority: 1 },
+        { id: 'P3', name: 'Process P3', arrival: 2, burst: 4, priority: 4 },
+        { id: 'P4', name: 'Process P4', arrival: 3, burst: 2, priority: 3 }
+      ],
+      a1: [
+        { id: 'P1', name: 'Water-quality monitoring', arrival: 0, burst: 5, priority: 2 },
+        { id: 'P2', name: 'Waste-collection scheduling', arrival: 1, burst: 3, priority: 1 },
+        { id: 'P3', name: 'Traffic-pollution analysis', arrival: 2, burst: 4, priority: 4 },
+        { id: 'P4', name: 'Public energy-use monitoring', arrival: 3, burst: 2, priority: 3 }
+      ],
+      a2: [
+        { id: 'P1', name: 'Flood-warning analysis', arrival: 0, burst: 5, priority: 2 },
+        { id: 'P2', name: 'Air-quality alert generation', arrival: 1, burst: 4, priority: 1 },
+        { id: 'P3', name: 'Emergency evacuation-route update', arrival: 2, burst: 3, priority: 4 },
+        { id: 'P4', name: 'Renewable-grid status monitoring', arrival: 3, burst: 2, priority: 3 }
+      ],
+      priority_demo: [
+        { id: 'P1', name: 'Background sensor sync', arrival: 0, burst: 6, priority: 4 },
+        { id: 'P2', name: 'Grid fault detector', arrival: 1, burst: 3, priority: 1 },
+        { id: 'P3', name: 'Telemetry logger', arrival: 2, burst: 4, priority: 3 },
+        { id: 'P4', name: 'Emergency valve override', arrival: 3, burst: 2, priority: 0 }
+      ]
+    };
+
+    const state = {
+      activeTab: 'disk',
+      disk: {
+        size: 200,
+        head: 50,
+        direction: 'right',
+        queue: [82, 170, 43, 140, 24, 16, 190],
+        selectedAlgo: 'FCFS',
+        results: {},
+        currentStep: 0,
+        isPlaying: false,
+        timerId: null
+      },
+      cpu: {
+        algo: 'RR',
+        quantum: 2,
+        overhead: 0,
+        priorityRule: 'low', // 'low' => lower number = higher priority; 'high' => higher number = higher priority
+        processes: CPU_SCENARIOS.sample.map(x => ({ ...x })),
+        sim: null,
+        clock: 0,
+        isPlaying: false,
+        timerId: null
+      }
+    };
+
+    // =========================================================================
+    // 2. NOTIFICATION & TAB SWITCHING
+    // =========================================================================
+    function showBanner(message, type = 'warning') {
+      const banner = document.getElementById('toast-banner');
+      const content = document.getElementById('toast-content');
+      banner.classList.remove('hidden');
+      if (type === 'error') {
+        content.className = 'rounded-xl px-4 py-3 text-sm font-semibold flex items-center justify-between border bg-[#fff0f0] border-[#f2b8be] text-[#9b2c2c]';
+      } else {
+        content.className = 'rounded-xl px-4 py-3 text-sm font-semibold flex items-center justify-between border bg-[#ffe5dc] border-[#efc0b6] text-[#873d49]';
+      }
+      content.innerHTML = `
+        <span>${message}</span>
+        <button onclick="document.getElementById('toast-banner').classList.add('hidden')" class="ml-4 text-xs font-extrabold underline">Dismiss</button>
+      `;
+    }
+
+    function hideBanner() {
+      document.getElementById('toast-banner').classList.add('hidden');
+    }
+
+    function switchMainTab(tab) {
+      state.activeTab = tab;
+      stopDiskPlay();
+      stopCpuPlay();
+
+      const diskBtn = document.getElementById('tab-disk');
+      const cpuBtn = document.getElementById('tab-cpu');
+      const diskSec = document.getElementById('section-disk');
+      const cpuSec = document.getElementById('section-cpu');
+
+      if (tab === 'disk') {
+        diskBtn.className = 'flex-1 md:flex-initial px-4 py-2 rounded-lg text-sm font-extrabold bg-[#d96f76] text-white shadow-sm flex items-center justify-center gap-2 transition';
+        cpuBtn.className = 'flex-1 md:flex-initial px-4 py-2 rounded-lg text-sm font-bold text-[#683d43] hover:text-[#873d49] flex items-center justify-center gap-2 transition';
+        diskSec.classList.remove('hidden');
+        cpuSec.classList.add('hidden');
+        renderDiskCanvas();
+        renderDiskBarChart();
+      } else {
+        cpuBtn.className = 'flex-1 md:flex-initial px-4 py-2 rounded-lg text-sm font-extrabold bg-[#d96f76] text-white shadow-sm flex items-center justify-center gap-2 transition';
+        diskBtn.className = 'flex-1 md:flex-initial px-4 py-2 rounded-lg text-sm font-bold text-[#683d43] hover:text-[#873d49] flex items-center justify-center gap-2 transition';
+        cpuSec.classList.remove('hidden');
+        diskSec.classList.add('hidden');
+        renderCpuSimulation();
+      }
+    }
+
+    // =========================================================================
+    // 3. PART A: DISK SCHEDULING (FCFS, SSTF, SCAN, C-SCAN, LOOK, C-LOOK)
+    // =========================================================================
+    function computeAllDiskAlgorithms(diskSize, initialHead, queue, direction) {
+      const maxCyl = diskSize - 1;
+      const results = {};
+
+      // --- 1. FCFS ---
+      {
+        let curr = initialHead;
+        let cum = 0;
+        const steps = [{
+          cylinder: curr, distance: 0, cumulative: 0, isBoundary: false, isJump: false,
+          reason: `Initial read/write head starts at cylinder ${curr}.`
+        }];
+        for (const req of queue) {
+          const dist = Math.abs(req - curr);
+          cum += dist;
+          steps.push({
+            cylinder: req, distance: dist, cumulative: cum, isBoundary: false, isJump: false,
+            reason: `FCFS picks next request in arrival order: cylinder ${req} (moved |${req} - ${curr}| = ${dist} tracks).`
+          });
+          curr = req;
+        }
+        results['FCFS'] = { steps, totalMovement: cum };
+      }
+
+      // --- 2. SSTF ---
+      {
+        let curr = initialHead;
+        let cum = 0;
+        const pending = queue.map((val, idx) => ({ val, idx, done: false }));
+        const steps = [{
+          cylinder: curr, distance: 0, cumulative: 0, isBoundary: false, isJump: false,
+          reason: `Initial read/write head starts at cylinder ${curr}.`
+        }];
+        for (let count = 0; count < pending.length; count++) {
+          let best = null;
+          let bestDist = Infinity;
+          for (const item of pending) {
+            if (!item.done) {
+              const d = Math.abs(item.val - curr);
+              if (d < bestDist) {
+                bestDist = d;
+                best = item;
+              }
+            }
+          }
+          best.done = true;
+          cum += bestDist;
+          steps.push({
+            cylinder: best.val, distance: bestDist, cumulative: cum, isBoundary: false, isJump: false,
+            reason: `SSTF selects cylinder ${best.val} because it has the shortest seek distance (${bestDist} tracks) from ${curr}.`
+          });
+          curr = best.val;
+        }
+        results['SSTF'] = { steps, totalMovement: cum };
+      }
+
+      const leftReqs = queue.filter(r => r < initialHead).sort((a, b) => b - a);  // Descending toward 0
+      const rightReqs = queue.filter(r => r >= initialHead).sort((a, b) => a - b); // Ascending toward maxCyl
+
+      // --- 3. SCAN ---
+      {
+        let curr = initialHead;
+        let cum = 0;
+        const steps = [{
+          cylinder: curr, distance: 0, cumulative: 0, isBoundary: false, isJump: false,
+          reason: `Initial head at cylinder ${curr}, SCAN sweeping ${direction === 'right' ? 'Right (toward ' + maxCyl + ')' : 'Left (toward 0)'}.`
+        }];
+
+        if (direction === 'right') {
+          for (const req of rightReqs) {
+            const dist = Math.abs(req - curr);
+            cum += dist;
+            steps.push({ cylinder: req, distance: dist, cumulative: cum, isBoundary: false, isJump: false, reason: `SCAN sweeping right services cylinder ${req} (+${dist} tracks).` });
+            curr = req;
+          }
+          if (leftReqs.length > 0 && curr !== maxCyl) {
+            const dist = Math.abs(maxCyl - curr);
+            cum += dist;
+            steps.push({ cylinder: maxCyl, distance: dist, cumulative: cum, isBoundary: true, isJump: false, reason: `SCAN reaches physical disk end (${maxCyl}) before reversing direction.` });
+            curr = maxCyl;
+          }
+          for (const req of leftReqs) {
+            const dist = Math.abs(req - curr);
+            cum += dist;
+            steps.push({ cylinder: req, distance: dist, cumulative: cum, isBoundary: false, isJump: false, reason: `SCAN sweeping left services cylinder ${req} (+${dist} tracks).` });
+            curr = req;
+          }
+        } else {
+          for (const req of leftReqs) {
+            const dist = Math.abs(req - curr);
+            cum += dist;
+            steps.push({ cylinder: req, distance: dist, cumulative: cum, isBoundary: false, isJump: false, reason: `SCAN sweeping left services cylinder ${req} (+${dist} tracks).` });
+            curr = req;
+          }
+          if (rightReqs.length > 0 && curr !== 0) {
+            const dist = Math.abs(0 - curr);
+            cum += dist;
+            steps.push({ cylinder: 0, distance: dist, cumulative: cum, isBoundary: true, isJump: false, reason: `SCAN reaches physical disk start (0) before reversing direction.` });
+            curr = 0;
+          }
+          for (const req of rightReqs) {
+            const dist = Math.abs(req - curr);
+            cum += dist;
+            steps.push({ cylinder: req, distance: dist, cumulative: cum, isBoundary: false, isJump: false, reason: `SCAN sweeping right services cylinder ${req} (+${dist} tracks).` });
+            curr = req;
+          }
+        }
+        results['SCAN'] = { steps, totalMovement: cum };
+      }
+
+      // --- 4. C-SCAN ---
+      {
+        let curr = initialHead;
+        let cum = 0;
+        const steps = [{
+          cylinder: curr, distance: 0, cumulative: 0, isBoundary: false, isJump: false,
+          reason: `Initial head at cylinder ${curr}, C-SCAN moving ${direction === 'right' ? 'Right' : 'Left'}.`
+        }];
+
+        if (direction === 'right') {
+          for (const req of rightReqs) {
+            const dist = Math.abs(req - curr);
+            cum += dist;
+            steps.push({ cylinder: req, distance: dist, cumulative: cum, isBoundary: false, isJump: false, reason: `C-SCAN sweeping right services cylinder ${req} (+${dist} tracks).` });
+            curr = req;
+          }
+          if (leftReqs.length > 0) {
+            if (curr !== maxCyl) {
+              const distToEdge = Math.abs(maxCyl - curr);
+              cum += distToEdge;
+              steps.push({ cylinder: maxCyl, distance: distToEdge, cumulative: cum, isBoundary: true, isJump: false, reason: `C-SCAN reaches upper disk boundary (${maxCyl}) before wrapping around.` });
+              curr = maxCyl;
+            }
+            const jumpDist = maxCyl;
+            cum += jumpDist;
+            steps.push({ cylinder: 0, distance: jumpDist, cumulative: cum, isBoundary: true, isJump: true, reason: `Circular Jump: Head returns from ${maxCyl} to cylinder 0 (+${jumpDist} tracks) without servicing requests.` });
+            curr = 0;
+            const leftAsc = [...leftReqs].sort((a, b) => a - b);
+            for (const req of leftAsc) {
+              const dist = Math.abs(req - curr);
+              cum += dist;
+              steps.push({ cylinder: req, distance: dist, cumulative: cum, isBoundary: false, isJump: false, reason: `C-SCAN continues sweeping right from 0 and services cylinder ${req} (+${dist} tracks).` });
+              curr = req;
+            }
+          }
+        } else {
+          for (const req of leftReqs) {
+            const dist = Math.abs(req - curr);
+            cum += dist;
+            steps.push({ cylinder: req, distance: dist, cumulative: cum, isBoundary: false, isJump: false, reason: `C-SCAN sweeping left services cylinder ${req} (+${dist} tracks).` });
+            curr = req;
+          }
+          if (rightReqs.length > 0) {
+            if (curr !== 0) {
+              const distToEdge = Math.abs(0 - curr);
+              cum += distToEdge;
+              steps.push({ cylinder: 0, distance: distToEdge, cumulative: cum, isBoundary: true, isJump: false, reason: `C-SCAN reaches lower disk boundary (0) before wrapping around.` });
+              curr = 0;
+            }
+            const jumpDist = maxCyl;
+            cum += jumpDist;
+            steps.push({ cylinder: maxCyl, distance: jumpDist, cumulative: cum, isBoundary: true, isJump: true, reason: `Circular Jump: Head jumps from 0 to cylinder ${maxCyl} (+${jumpDist} tracks) to continue scanning left.` });
+            curr = maxCyl;
+            const rightDesc = [...rightReqs].sort((a, b) => b - a);
+            for (const req of rightDesc) {
+              const dist = Math.abs(req - curr);
+              cum += dist;
+              steps.push({ cylinder: req, distance: dist, cumulative: cum, isBoundary: false, isJump: false, reason: `C-SCAN continues sweeping left from ${maxCyl} and services cylinder ${req} (+${dist} tracks).` });
+              curr = req;
+            }
+          }
+        }
+        results['C-SCAN'] = { steps, totalMovement: cum };
+      }
+
+      // --- 5. LOOK ---
+      {
+        let curr = initialHead;
+        let cum = 0;
+        const steps = [{
+          cylinder: curr, distance: 0, cumulative: 0, isBoundary: false, isJump: false,
+          reason: `Initial head at cylinder ${curr}, LOOK scanning ${direction === 'right' ? 'Right' : 'Left'} only up to the farthest pending request.`
+        }];
+
+        if (direction === 'right') {
+          for (const req of rightReqs) {
+            const dist = Math.abs(req - curr);
+            cum += dist;
+            steps.push({ cylinder: req, distance: dist, cumulative: cum, isBoundary: false, isJump: false, reason: `LOOK moving right services cylinder ${req} (+${dist} tracks).` });
+            curr = req;
+          }
+          for (let i = 0; i < leftReqs.length; i++) {
+            const req = leftReqs[i];
+            const dist = Math.abs(req - curr);
+            cum += dist;
+            const note = i === 0 ? `No more requests to the right — LOOK reverses early at ${curr} and moves to ${req}` : `LOOK moving left services cylinder ${req}`;
+            steps.push({ cylinder: req, distance: dist, cumulative: cum, isBoundary: false, isJump: false, reason: `${note} (+${dist} tracks).` });
+            curr = req;
+          }
+        } else {
+          for (const req of leftReqs) {
+            const dist = Math.abs(req - curr);
+            cum += dist;
+            steps.push({ cylinder: req, distance: dist, cumulative: cum, isBoundary: false, isJump: false, reason: `LOOK moving left services cylinder ${req} (+${dist} tracks).` });
+            curr = req;
+          }
+          for (let i = 0; i < rightReqs.length; i++) {
+            const req = rightReqs[i];
+            const dist = Math.abs(req - curr);
+            cum += dist;
+            const note = i === 0 ? `No more requests to the left — LOOK reverses early at ${curr} and moves to ${req}` : `LOOK moving right services cylinder ${req}`;
+            steps.push({ cylinder: req, distance: dist, cumulative: cum, isBoundary: false, isJump: false, reason: `${note} (+${dist} tracks).` });
+            curr = req;
+          }
+        }
+        results['LOOK'] = { steps, totalMovement: cum };
+      }
+
+      // --- 6. C-LOOK (Circular LOOK) ---
+      {
+        let curr = initialHead;
+        let cum = 0;
+        const steps = [{
+          cylinder: curr, distance: 0, cumulative: 0, isBoundary: false, isJump: false,
+          reason: `Initial head at cylinder ${curr}, C-LOOK scanning ${direction === 'right' ? 'Right' : 'Left'} up to the last request before circular wrap-around.`
+        }];
+
+        if (direction === 'right') {
+          for (const req of rightReqs) {
+            const dist = Math.abs(req - curr);
+            cum += dist;
+            steps.push({ cylinder: req, distance: dist, cumulative: cum, isBoundary: false, isJump: false, reason: `C-LOOK moving right services cylinder ${req} (+${dist} tracks).` });
+            curr = req;
+          }
+          if (leftReqs.length > 0) {
+            const leftAsc = [...leftReqs].sort((a, b) => a - b);
+            const firstWrapTarget = leftAsc[0];
+            const jumpDist = Math.abs(firstWrapTarget - curr);
+            cum += jumpDist;
+            steps.push({
+              cylinder: firstWrapTarget, distance: jumpDist, cumulative: cum, isBoundary: true, isJump: true,
+              reason: `C-LOOK Wrap Jump: Reached highest request (${curr}), jumps directly to lowest pending request (${firstWrapTarget}) (+${jumpDist} tracks) without visiting physical edges.`
+            });
+            curr = firstWrapTarget;
+            for (let i = 1; i < leftAsc.length; i++) {
+              const req = leftAsc[i];
+              const dist = Math.abs(req - curr);
+              cum += dist;
+              steps.push({ cylinder: req, distance: dist, cumulative: cum, isBoundary: false, isJump: false, reason: `C-LOOK continues sweeping right and services cylinder ${req} (+${dist} tracks).` });
+              curr = req;
+            }
+          }
+        } else {
+          for (const req of leftReqs) {
+            const dist = Math.abs(req - curr);
+            cum += dist;
+            steps.push({ cylinder: req, distance: dist, cumulative: cum, isBoundary: false, isJump: false, reason: `C-LOOK moving left services cylinder ${req} (+${dist} tracks).` });
+            curr = req;
+          }
+          if (rightReqs.length > 0) {
+            const rightDesc = [...rightReqs].sort((a, b) => b - a);
+            const firstWrapTarget = rightDesc[0];
+            const jumpDist = Math.abs(firstWrapTarget - curr);
+            cum += jumpDist;
+            steps.push({
+              cylinder: firstWrapTarget, distance: jumpDist, cumulative: cum, isBoundary: true, isJump: true,
+              reason: `C-LOOK Wrap Jump: Reached lowest request (${curr}), jumps directly to highest pending request (${firstWrapTarget}) (+${jumpDist} tracks) without visiting physical edges.`
+            });
+            curr = firstWrapTarget;
+            for (let i = 1; i < rightDesc.length; i++) {
+              const req = rightDesc[i];
+              const dist = Math.abs(req - curr);
+              cum += dist;
+              steps.push({ cylinder: req, distance: dist, cumulative: cum, isBoundary: false, isJump: false, reason: `C-LOOK continues sweeping left and services cylinder ${req} (+${dist} tracks).` });
+              curr = req;
+            }
+          }
+        }
+        results['C-LOOK'] = { steps, totalMovement: cum };
+      }
+
+      return results;
+    }
+
+    function recomputeDisk() {
+      hideBanner();
+      stopDiskPlay();
+
+      const sizeInput = parseInt(document.getElementById('disk-size').value, 10);
+      const headInput = parseInt(document.getElementById('disk-head').value, 10);
+      const queueRaw = document.getElementById('disk-queue').value;
+
+      if (isNaN(sizeInput) || sizeInput < 10 || sizeInput > 2000) {
+        showBanner('Please enter a valid Disk Size between 10 and 2000 cylinders.', 'error');
+        return;
+      }
+
+      const maxCyl = sizeInput - 1;
+      document.getElementById('disk-max-label').textContent = maxCyl;
+
+      if (isNaN(headInput) || headInput < 0 || headInput > maxCyl) {
+        showBanner(`Initial Head Position must be between 0 and ${maxCyl}.`, 'error');
+        return;
+      }
+
+      const tokens = queueRaw.split(/[\s,]+/).filter(t => t.trim() !== '');
+      const parsedQueue = [];
+      for (const tok of tokens) {
+        const num = Number(tok);
+        if (!Number.isInteger(num) || num < 0 || num > maxCyl) {
+          showBanner(`Invalid cylinder "${tok}" in request queue. All requests must be integers between 0 and ${maxCyl}.`, 'error');
+          return;
+        }
+        parsedQueue.push(num);
+      }
+
+      if (parsedQueue.length === 0) {
+        showBanner('Please enter at least one cylinder request in the queue.', 'warning');
+        return;
+      }
+
+      state.disk.size = sizeInput;
+      state.disk.head = headInput;
+      state.disk.queue = parsedQueue;
+      state.disk.results = computeAllDiskAlgorithms(sizeInput, headInput, parsedQueue, state.disk.direction);
+      state.disk.currentStep = state.disk.results[state.disk.selectedAlgo].steps.length - 1;
+
+      updateDiskGuide();
+      updateDiskUI();
+      renderDiskComparison();
+    }
+
+    function selectDiskAlgo(algo) {
+      stopDiskPlay();
+      state.disk.selectedAlgo = algo;
+      document.querySelectorAll('.disk-algo-btn').forEach(btn => {
+        if (btn.dataset.diskAlgo === algo) {
+          btn.className = 'disk-algo-btn px-3.5 py-2 rounded-xl text-xs sm:text-sm font-extrabold bg-[#d96f76] text-white shadow-sm transition';
+        } else {
+          btn.className = 'disk-algo-btn px-3.5 py-2 rounded-xl text-xs sm:text-sm font-bold bg-[#fff0e8] text-[#683d43] border border-[#efcfc4] hover:bg-[#ffe3d7] transition';
+        }
+      });
+      const res = state.disk.results[algo];
+      state.disk.currentStep = res ? res.steps.length - 1 : 0;
+      updateDiskGuide();
+      updateDiskUI();
+      renderDiskComparison();
+    }
+
+    function setDiskDirection(dir) {
+      state.disk.direction = dir;
+      const leftBtn = document.getElementById('dir-left');
+      const rightBtn = document.getElementById('dir-right');
+      if (dir === 'left') {
+        leftBtn.className = 'px-2.5 py-1.5 rounded-lg text-xs font-extrabold bg-[#d96f76] text-white shadow-sm transition flex items-center justify-center gap-1';
+        rightBtn.className = 'px-2.5 py-1.5 rounded-lg text-xs font-bold text-[#683d43] hover:text-[#873d49] transition flex items-center justify-center gap-1';
+      } else {
+        rightBtn.className = 'px-2.5 py-1.5 rounded-lg text-xs font-extrabold bg-[#d96f76] text-white shadow-sm transition flex items-center justify-center gap-1';
+        leftBtn.className = 'px-2.5 py-1.5 rounded-lg text-xs font-bold text-[#683d43] hover:text-[#873d49] transition flex items-center justify-center gap-1';
+      }
+      recomputeDisk();
+    }
+
+    function applyDiskPreset(preset) {
+      if (preset === 'sample') {
+        document.getElementById('disk-size').value = 200;
+        document.getElementById('disk-head').value = 50;
+        document.getElementById('disk-queue').value = '82, 170, 43, 140, 24, 16, 190';
+        setDiskDirection('right');
+      } else if (preset === 'textbook') {
+        document.getElementById('disk-size').value = 200;
+        document.getElementById('disk-head').value = 53;
+        document.getElementById('disk-queue').value = '98, 183, 37, 122, 14, 124, 65, 67';
+        setDiskDirection('right');
+      } else if (preset === 'clustered') {
+        document.getElementById('disk-size').value = 200;
+        document.getElementById('disk-head').value = 100;
+        document.getElementById('disk-queue').value = '95, 104, 98, 110, 12, 188, 102, 91';
+        setDiskDirection('right');
+      } else if (preset === 'edge') {
+        document.getElementById('disk-size').value = 200;
+        document.getElementById('disk-head').value = 40;
+        document.getElementById('disk-queue').value = '5, 192, 12, 185, 2, 196, 25';
+        setDiskDirection('left');
+      }
+    }
+
+    function randomizeDiskQueue() {
+      const size = parseInt(document.getElementById('disk-size').value, 10) || 200;
+      const maxCyl = Math.max(19, size - 1);
+      const head = Math.floor(Math.random() * (maxCyl - 10)) + 5;
+      const count = 8;
+      const arr = [];
+      while (arr.length < count) {
+        const candidate = Math.floor(Math.random() * (maxCyl + 1));
+        if (candidate !== head && !arr.includes(candidate)) {
+          arr.push(candidate);
+        }
+      }
+      document.getElementById('disk-head').value = head;
+      document.getElementById('disk-queue').value = arr.join(', ');
+      recomputeDisk();
+    }
+
+    function diskReset() {
+      stopDiskPlay();
+      state.disk.currentStep = 0;
+      updateDiskUI();
+    }
+
+    function diskStepForward() {
+      const steps = state.disk.results[state.disk.selectedAlgo].steps;
+      if (state.disk.currentStep < steps.length - 1) {
+        state.disk.currentStep++;
+        updateDiskUI();
+      } else {
+        stopDiskPlay();
+      }
+    }
+
+    function diskStepBack() {
+      stopDiskPlay();
+      if (state.disk.currentStep > 0) {
+        state.disk.currentStep--;
+        updateDiskUI();
+      }
+    }
+
+    function toggleDiskPlay() {
+      if (state.disk.isPlaying) {
+        stopDiskPlay();
+      } else {
+        const steps = state.disk.results[state.disk.selectedAlgo].steps;
+        if (state.disk.currentStep >= steps.length - 1) {
+          state.disk.currentStep = 0;
+          updateDiskUI();
+        }
+        state.disk.isPlaying = true;
+        updateDiskPlayButton();
+        const speedVal = parseInt(document.getElementById('disk-speed').value, 10);
+        const intervalMs = Math.round(1100 / (speedVal * 0.65));
+        state.disk.timerId = setInterval(() => {
+          const s = state.disk.results[state.disk.selectedAlgo].steps;
+          if (state.disk.currentStep < s.length - 1) {
+            state.disk.currentStep++;
+            updateDiskUI();
+          } else {
+            stopDiskPlay();
+          }
+        }, intervalMs);
+      }
+    }
+
+    function stopDiskPlay() {
+      state.disk.isPlaying = false;
+      if (state.disk.timerId) {
+        clearInterval(state.disk.timerId);
+        state.disk.timerId = null;
+      }
+      updateDiskPlayButton();
+    }
+
+    function updateDiskPlayButton() {
+      const icon = document.getElementById('disk-play-icon');
+      const text = document.getElementById('disk-play-text');
+      if (state.disk.isPlaying) {
+        icon.innerHTML = '<path d="M6 5h4v14H6zm8 0h4v14h-4z"/>';
+        text.textContent = 'Pause';
+      } else {
+        icon.innerHTML = '<path d="M8 5v14l11-7z"/>';
+        text.textContent = 'Play';
+      }
+    }
+
+    function updateDiskGuide() {
+      const guide = DISK_GUIDES[state.disk.selectedAlgo];
+      document.getElementById('disk-guide-title').textContent = guide.title;
+      document.getElementById('disk-guide-desc').textContent = guide.desc;
+      document.getElementById('disk-guide-pros').textContent = guide.pros;
+      document.getElementById('disk-guide-cons').textContent = guide.cons;
+    }
+
+    function updateDiskUI() {
+      const algo = state.disk.selectedAlgo;
+      const result = state.disk.results[algo];
+      if (!result) return;
+
+      const steps = result.steps;
+      const idx = Math.min(state.disk.currentStep, steps.length - 1);
+      const currObj = steps[idx];
+
+      document.getElementById('disk-graph-title').textContent = `${algo} — Disk Arm Seek Graph`;
+      document.getElementById('disk-step-badge').textContent = `Step ${idx} / ${steps.length - 1}`;
+      document.getElementById('disk-current-movement').textContent = currObj.cumulative;
+      document.getElementById('disk-total-movement').textContent = result.totalMovement;
+      document.getElementById('disk-req-count').textContent = state.disk.queue.length;
+      document.getElementById('disk-avg-seek').textContent = (result.totalMovement / state.disk.queue.length).toFixed(1);
+
+      const pct = steps.length > 1 ? (idx / (steps.length - 1)) * 100 : 100;
+      document.getElementById('disk-progress-bar').style.width = `${pct}%`;
+
+      document.getElementById('disk-step-narration').textContent = currObj.reason;
+      if (idx === 0) {
+        document.getElementById('disk-step-math').textContent = `Start Cylinder = ${currObj.cylinder} | Cumulative Seek = 0`;
+      } else {
+        const prevObj = steps[idx - 1];
+        document.getElementById('disk-step-math').textContent =
+          `Step ${idx}: |${currObj.cylinder} - ${prevObj.cylinder}| = +${currObj.distance} tracks  →  Cumulative = ${currObj.cumulative}`;
+      }
+
+      const chipsContainer = document.getElementById('disk-sequence-chips');
+      chipsContainer.innerHTML = steps.map((s, i) => {
+        const isVisited = i <= idx;
+        const isActive = i === idx;
+        let badgeStyle = 'bg-[#fff9f6] text-[#a68386] border-[#f2ddd6]';
+        if (isActive) {
+          badgeStyle = 'bg-[#d96f76] text-white border-[#b9475a] ring-2 ring-[#efc0b6] font-black';
+        } else if (isVisited) {
+          if (i === 0) {
+            badgeStyle = 'bg-[#eefaf3] text-[#276749] border-[#9ae6b4] font-extrabold';
+          } else if (s.isBoundary) {
+            badgeStyle = 'bg-[#fffbeb] text-[#b45309] border-[#f59e0b] border-dashed font-extrabold';
+          } else {
+            badgeStyle = 'bg-[#ffe5dc] text-[#873d49] border-[#efc0b6] font-extrabold';
+          }
+        }
+        const arrow = i < steps.length - 1 ? `<span class="text-[#c9a3a6] text-xs font-bold">&rarr;</span>` : '';
+        return `<span class="px-2.5 py-1 rounded-lg border text-xs font-mono transition ${badgeStyle}">${s.cylinder}</span>${arrow}`;
+      }).join('');
+
+      renderDiskCanvas();
+    }
+
+    function renderDiskCanvas() {
+      const container = document.getElementById('disk-canvas-container');
+      const canvas = document.getElementById('disk-canvas');
+      if (!container || !canvas) return;
+
+      const algo = state.disk.selectedAlgo;
+      const result = state.disk.results[algo];
+      if (!result) return;
+
+      const steps = result.steps;
+      const currentStep = state.disk.currentStep;
+      const maxCyl = state.disk.size - 1;
+
+      const dpr = window.devicePixelRatio || 1;
+      const rect = container.getBoundingClientRect();
+      const width = Math.max(320, rect.width);
+      const height = Math.max(360, Math.min(440, 60 + steps.length * 34));
+      container.style.height = `${height}px`;
+
+      canvas.width = width * dpr;
+      canvas.height = height * dpr;
+
+      const ctx = canvas.getContext('2d');
+      ctx.scale(dpr, dpr);
+      ctx.clearRect(0, 0, width, height);
+
+      const padLeft = 36;
+      const padRight = 36;
+      const padTop = 44;
+      const padBottom = 26;
+      const plotW = width - padLeft - padRight;
+      const plotH = height - padTop - padBottom;
+
+      const xScale = (cyl) => padLeft + (cyl / maxCyl) * plotW;
+      const yScale = (stepIdx) => padTop + (steps.length > 1 ? (stepIdx / (steps.length - 1)) * plotH : plotH / 2);
+
+      // Top Axis Line
+      ctx.strokeStyle = '#e6c2b8';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.moveTo(padLeft, padTop - 10);
+      ctx.lineTo(width - padRight, padTop - 10);
+      ctx.stroke();
+
+      const rulerTicks = [0, Math.round(maxCyl * 0.25), Math.round(maxCyl * 0.5), Math.round(maxCyl * 0.75), maxCyl];
+      ctx.font = '600 11px "JetBrains Mono", monospace';
+      ctx.textAlign = 'center';
+      rulerTicks.forEach(t => {
+        const x = xScale(t);
+        ctx.strokeStyle = '#f2dcd6';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(x, padTop - 10);
+        ctx.lineTo(x, height - padBottom);
+        ctx.stroke();
+
+        ctx.fillStyle = '#815f62';
+        ctx.fillText(t.toString(), x, padTop - 18);
+      });
+
+      // Faint preview dashed line
+      if (steps.length > 1) {
+        ctx.save();
+        ctx.strokeStyle = '#ebd0c8';
+        ctx.lineWidth = 2;
+        ctx.setLineDash([4, 4]);
+        ctx.beginPath();
+        for (let i = 0; i < steps.length; i++) {
+          const x = xScale(steps[i].cylinder);
+          const y = yScale(i);
+          if (i === 0) ctx.moveTo(x, y);
+          else ctx.lineTo(x, y);
+        }
+        ctx.stroke();
+        ctx.restore();
+      }
+
+      // Active Path Segments
+      for (let i = 1; i <= currentStep; i++) {
+        const prev = steps[i - 1];
+        const curr = steps[i];
+        const x1 = xScale(prev.cylinder);
+        const y1 = yScale(i - 1);
+        const x2 = xScale(curr.cylinder);
+        const y2 = yScale(i);
+
+        ctx.save();
+        if (curr.isJump) {
+          ctx.strokeStyle = '#d97706';
+          ctx.setLineDash([6, 4]);
+          ctx.lineWidth = 2.4;
+        } else {
+          ctx.strokeStyle = i === currentStep ? '#b9475a' : '#d96f76';
+          ctx.lineWidth = i === currentStep ? 3.2 : 2.3;
+        }
+
+        ctx.beginPath();
+        ctx.moveTo(x1, y1);
+        ctx.lineTo(x2, y2);
+        ctx.stroke();
+
+        // Directional Arrowhead
+        const midX = (x1 + x2) / 2;
+        const midY = (y1 + y2) / 2;
+        const angle = Math.atan2(y2 - y1, x2 - x1);
+        const arrowLen = 7.5;
+        ctx.setLineDash([]);
+        ctx.fillStyle = curr.isJump ? '#d97706' : '#b9475a';
+        ctx.beginPath();
+        ctx.moveTo(midX, midY);
+        ctx.lineTo(midX - arrowLen * Math.cos(angle - Math.PI / 6), midY - arrowLen * Math.sin(angle - Math.PI / 6));
+        ctx.lineTo(midX - arrowLen * Math.cos(angle + Math.PI / 6), midY - arrowLen * Math.sin(angle + Math.PI / 6));
+        ctx.closePath();
+        ctx.fill();
+        ctx.restore();
+      }
+
+      // Nodes & Cylinder Labels
+      for (let i = 0; i <= currentStep; i++) {
+        const s = steps[i];
+        const x = xScale(s.cylinder);
+        const y = yScale(i);
+        const isCurrent = i === currentStep;
+
+        if (isCurrent) {
+          ctx.fillStyle = 'rgba(217, 111, 118, 0.24)';
+          ctx.beginPath();
+          ctx.arc(x, y, 13, 0, Math.PI * 2);
+          ctx.fill();
+        }
+
+        ctx.fillStyle = i === 0 ? '#2f855a' : (s.isBoundary ? '#d97706' : '#d96f76');
+        ctx.beginPath();
+        ctx.arc(x, y, isCurrent ? 6.5 : 4.8, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.strokeStyle = '#FFFFFF';
+        ctx.lineWidth = 1.6;
+        ctx.stroke();
+
+        ctx.font = isCurrent ? 'bold 11px "JetBrains Mono", monospace' : '700 10px "JetBrains Mono", monospace';
+        const label = `${s.cylinder}`;
+        const labelW = ctx.measureText(label).width + 10;
+        const labelH = 17;
+        let labelX = x - labelW / 2;
+        if (labelX < 4) labelX = 4;
+        if (labelX + labelW > width - 4) labelX = width - labelW - 4;
+        const labelY = y - 22;
+
+        ctx.fillStyle = isCurrent ? '#873d49' : 'rgba(255, 255, 255, 0.95)';
+        ctx.strokeStyle = isCurrent ? '#873d49' : '#e6c2b8';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.roundRect(labelX, labelY, labelW, labelH, 5);
+        ctx.fill();
+        ctx.stroke();
+
+        ctx.fillStyle = isCurrent ? '#FFFFFF' : '#482d32';
+        ctx.textAlign = 'center';
+        ctx.fillText(label, labelX + labelW / 2, labelY + 12);
+      }
+    }
+
+    function renderDiskComparison() {
+      const algos = ['FCFS', 'SSTF', 'SCAN', 'C-SCAN', 'LOOK', 'C-LOOK'];
+      const entries = algos.map(a => ({
+        algo: a,
+        total: state.disk.results[a]?.totalMovement ?? 0
+      }));
+
+      const minTotal = Math.min(...entries.map(e => e.total));
+      const bestAlgos = entries.filter(e => e.total === minTotal).map(e => e.algo).join(', ');
+      document.getElementById('disk-best-badge').innerHTML = `
+        <svg class="w-4 h-4 text-[#2f855a]" fill="none" stroke="currentColor" stroke-width="2.4" viewBox="0 0 24 24"><path d="M5 13l4 4L19 7" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <span>Lowest Head Movement: ${bestAlgos} (${minTotal} cyl)</span>
+      `;
+
+      const tbody = document.getElementById('disk-comparison-tbody');
+      tbody.innerHTML = entries.map(e => {
+        const isBest = e.total === minTotal;
+        const isSelected = e.algo === state.disk.selectedAlgo;
+        const avg = (e.total / state.disk.queue.length).toFixed(1);
+        return `
+          <tr class="${isSelected ? 'bg-[#ffe5dc]/75' : 'hover:bg-[#fff9f6]'} transition">
+            <td class="py-2.5 px-3 font-extrabold text-[#482d32] flex items-center gap-2">
+              <span>${e.algo}</span>
+              ${isBest ? '<span class="text-[10px] font-black px-1.5 py-0.5 rounded bg-[#def7ec] text-[#276749] border border-[#9ae6b4]">BEST</span>' : ''}
+            </td>
+            <td class="py-2.5 px-3 text-right font-mono font-extrabold ${isBest ? 'text-[#276749]' : 'text-[#873d49]'}">${e.total}</td>
+            <td class="py-2.5 px-3 text-right font-mono text-[#683d43]">${avg}</td>
+            <td class="py-2.5 px-3 text-right">
+              <button onclick="selectDiskAlgo('${e.algo}')" class="text-xs font-extrabold text-[#c85c66] hover:text-[#873d49] underline">
+                ${isSelected ? 'Viewing' : 'Animate'}
+              </button>
+            </td>
+          </tr>
+        `;
+      }).join('');
+
+      renderDiskBarChart();
+    }
+
+    function renderDiskBarChart() {
+      const container = document.getElementById('disk-bar-container');
+      const canvas = document.getElementById('disk-bar-canvas');
+      if (!container || !canvas || !state.disk.results['FCFS']) return;
+
+      const algos = ['FCFS', 'SSTF', 'SCAN', 'C-SCAN', 'LOOK', 'C-LOOK'];
+      const values = algos.map(a => state.disk.results[a].totalMovement);
+      const maxVal = Math.max(...values, 10);
+      const minVal = Math.min(...values);
+
+      const dpr = window.devicePixelRatio || 1;
+      const rect = container.getBoundingClientRect();
+      const width = Math.max(280, rect.width - 16);
+      const height = Math.max(240, rect.height - 16);
+
+      canvas.width = width * dpr;
+      canvas.height = height * dpr;
+
+      const ctx = canvas.getContext('2d');
+      ctx.scale(dpr, dpr);
+      ctx.clearRect(0, 0, width, height);
+
+      const padLeft = 46;
+      const padRight = 18;
+      const padTop = 28;
+      const padBottom = 34;
+      const chartW = width - padLeft - padRight;
+      const chartH = height - padTop - padBottom;
+
+      const gridLines = 4;
+      ctx.font = '600 11px "JetBrains Mono", monospace';
+      ctx.textAlign = 'right';
+      for (let g = 0; g <= gridLines; g++) {
+        const val = Math.round((maxVal * g) / gridLines);
+        const y = padTop + chartH - (g / gridLines) * chartH;
+        ctx.strokeStyle = '#f2dcd6';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(padLeft, y);
+        ctx.lineTo(width - padRight, y);
+        ctx.stroke();
+
+        ctx.fillStyle = '#815f62';
+        ctx.fillText(val.toString(), padLeft - 8, y + 4);
+      }
+
+      const slotW = chartW / algos.length;
+      const barW = Math.min(44, slotW * 0.56);
+
+      algos.forEach((algo, idx) => {
+        const val = values[idx];
+        const barH = (val / maxVal) * chartH;
+        const x = padLeft + idx * slotW + (slotW - barW) / 2;
+        const y = padTop + chartH - barH;
+
+        const isBest = val === minVal;
+        const isSelected = algo === state.disk.selectedAlgo;
+
+        ctx.fillStyle = isBest ? '#2f855a' : (isSelected ? '#c85c66' : '#e8877d');
+        ctx.beginPath();
+        ctx.roundRect(x, y, barW, barH, [6, 6, 0, 0]);
+        ctx.fill();
+
+        ctx.fillStyle = '#482d32';
+        ctx.font = 'bold 11px "JetBrains Mono", monospace';
+        ctx.textAlign = 'center';
+        ctx.fillText(val.toString(), x + barW / 2, y - 6);
+
+        ctx.fillStyle = isSelected ? '#873d49' : '#683d43';
+        ctx.font = isSelected ? '800 11px "Inter", sans-serif' : '700 11px "Inter", sans-serif';
+        ctx.fillText(algo, x + barW / 2, padTop + chartH + 18);
+      });
+    }
+
+    // =========================================================================
+    // 4. PART B: CPU SCHEDULING (RR STUDIO + FCFS + SJF + SRTF + PRIORITY)
+    // =========================================================================
+
+    function renderCpuProcessCards() {
+      const container = document.getElementById('cpu-process-cards');
+      container.innerHTML = state.cpu.processes.map((p, idx) => {
+        const c = BLUSH_PROCESS_COLORS[idx % BLUSH_PROCESS_COLORS.length];
+        return `
+          <div class="p-2.5 bg-[#fff9f6] border border-[#f2ddd6] rounded-xl space-y-2">
+            <div class="flex items-center justify-between gap-1">
+              <span class="px-2 py-0.5 rounded-md text-xs font-mono font-black text-white" style="background:${c.bg};">${p.id}</span>
+              <input type="text" value="${p.name}" onchange="updateCpuProc(${idx}, 'name', this.value)"
+                class="blush-input flex-1 px-2 py-0.5 text-xs font-semibold truncate" title="Process Name" />
+              <button onclick="removeCpuProcess(${idx})" ${state.cpu.processes.length <= 2 ? 'disabled' : ''}
+                class="text-[#815f62] hover:text-[#b9475a] disabled:opacity-30 text-xs font-bold px-1" title="Remove">&times;</button>
+            </div>
+            <div class="grid grid-cols-3 gap-1.5">
+              <div>
+                <label class="block text-[10px] font-bold text-[#815f62]">AT (ms)</label>
+                <input type="number" min="0" step="1" value="${p.arrival}" onchange="updateCpuProc(${idx}, 'arrival', this.value)"
+                  class="blush-input w-full px-2 py-1 text-xs font-mono font-bold" />
+              </div>
+              <div>
+                <label class="block text-[10px] font-bold text-[#815f62]">BT (ms)</label>
+                <input type="number" min="1" step="1" value="${p.burst}" onchange="updateCpuProc(${idx}, 'burst', this.value)"
+                  class="blush-input w-full px-2 py-1 text-xs font-mono font-bold" />
+              </div>
+              <div>
+                <label class="block text-[10px] font-bold text-[#815f62]">Priority</label>
+                <input type="number" min="0" step="1" value="${p.priority}" onchange="updateCpuProc(${idx}, 'priority', this.value)"
+                  class="blush-input w-full px-2 py-1 text-xs font-mono font-bold" />
+              </div>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function updateCpuProc(idx, field, val) {
+      if (field === 'name') {
+        state.cpu.processes[idx].name = val.trim() || state.cpu.processes[idx].id;
+      } else {
+        const num = parseInt(val, 10);
+        if (isNaN(num)) return;
+        if (field === 'arrival') state.cpu.processes[idx].arrival = Math.max(0, num);
+        if (field === 'burst') state.cpu.processes[idx].burst = Math.max(1, num);
+        if (field === 'priority') state.cpu.processes[idx].priority = Math.max(0, num);
+      }
+      document.getElementById('cpu-scenario').value = 'custom';
+      recomputeCpu();
+    }
+
+    function addCpuProcess() {
+      if (state.cpu.processes.length >= 8) {
+        showBanner('Maximum 8 processes allowed for clean timeline readability.', 'warning');
+        return;
+      }
+      const nextNum = state.cpu.processes.length + 1;
+      state.cpu.processes.push({
+        id: `P${nextNum}`,
+        name: `Process ${nextNum}`,
+        arrival: 0,
+        burst: 3,
+        priority: nextNum
+      });
+      document.getElementById('cpu-scenario').value = 'custom';
+      renderCpuProcessCards();
+      recomputeCpu();
+    }
+
+    function removeCpuProcess(idx) {
+      if (state.cpu.processes.length <= 2) return;
+      state.cpu.processes.splice(idx, 1);
+      // Re-index PIDs cleanly P1..Pn
+      state.cpu.processes.forEach((p, i) => { p.id = `P${i + 1}`; });
+      renderCpuProcessCards();
+      recomputeCpu();
+    }
+
+    function handleCpuScenarioChange() {
+      const val = document.getElementById('cpu-scenario').value;
+      if (val === 'custom') return;
+      state.cpu.processes = CPU_SCENARIOS[val].map(p => ({ ...p }));
+      if (val === 'sample' || val === 'a1') {
+        document.getElementById('cpu-quantum').value = 2;
+        document.getElementById('cpu-overhead').value = 0;
+      } else if (val === 'a2') {
+        document.getElementById('cpu-quantum').value = 2;
+        document.getElementById('cpu-overhead').value = 1;
+      } else if (val === 'priority_demo') {
+        document.getElementById('cpu-quantum').value = 2;
+        document.getElementById('cpu-overhead').value = 0;
+      }
+      renderCpuProcessCards();
+      recomputeCpu();
+    }
+
+    function selectCpuAlgo(algo) {
+      stopCpuPlay();
+      state.cpu.algo = algo;
+
+      document.querySelectorAll('.cpu-algo-btn').forEach(btn => {
+        if (btn.dataset.cpuAlgo === algo) {
+          btn.className = 'cpu-algo-btn px-2.5 py-2 rounded-xl text-xs font-extrabold bg-[#d96f76] text-white shadow-sm transition';
+        } else {
+          btn.className = 'cpu-algo-btn px-2.5 py-2 rounded-xl text-xs font-bold bg-[#fff0e8] text-[#683d43] border border-[#efcfc4] hover:bg-[#ffe3d7] transition';
+        }
+      });
+
+      const qField = document.getElementById('rr-quantum-field');
+      const ohField = document.getElementById('rr-overhead-field');
+      const prField = document.getElementById('priority-rule-field');
+      const rrCompPanel = document.getElementById('cpu-rr-comparison-panel');
+
+      if (algo === 'RR') {
+        qField.classList.remove('hidden');
+        ohField.classList.remove('hidden');
+        prField.classList.add('hidden');
+        rrCompPanel.classList.remove('hidden');
+      } else if (algo === 'PRIORITY_NP' || algo === 'PRIORITY_P') {
+        qField.classList.add('hidden');
+        ohField.classList.add('hidden');
+        prField.classList.remove('hidden');
+        rrCompPanel.classList.add('hidden');
+      } else {
+        qField.classList.add('hidden');
+        ohField.classList.add('hidden');
+        prField.classList.add('hidden');
+        rrCompPanel.classList.add('hidden');
+      }
+
+      recomputeCpu();
+    }
+
+    /**
+     * Unified Discrete-Time CPU Scheduler Engine
+     * Supports: RR (with optional Context Switch overhead), FCFS, SJF, SRTF, PRIORITY_NP, PRIORITY_P
+     */
+    function buildCpuSchedule(inputProcs, algo, options = {}) {
+      const quantum = Math.max(1, options.quantum || 2);
+      const overhead = algo === 'RR' ? Math.max(0, options.overhead || 0) : 0;
+      const priorityRule = options.priorityRule || 'low';
+
+      const procs = inputProcs.map((p, idx) => ({
+        ...p,
+        order: idx,
+        rem: p.burst,
+        ct: null,
+        first: null
+      }));
+
+      const segs = [];
+      const stepEvents = {};
+      const readySnapshots = {};
+      let now = 0;
+      let done = 0;
+      const n = procs.length;
+      let guard = 0;
+
+      const addSeg = (type, id, start, end) => {
+        if (end <= start) return;
+        const last = segs[segs.length - 1];
+        if (last && last.type === type && last.id === id && last.end === start) {
+          last.end = end;
+        } else {
+          segs.push({ type, id, start, end });
+        }
+      };
+
+      const priorityCompare = (a, b) => {
+        if (a.priority !== b.priority) {
+          return priorityRule === 'low' ? a.priority - b.priority : b.priority - a.priority;
+        }
+        if (a.arrival !== b.arrival) return a.arrival - b.arrival;
+        return a.order - b.order;
+      };
+
+      if (algo === 'RR') {
+        const sorted = [...procs].sort((a, b) => a.arrival - b.arrival || a.order - b.order);
+        const queue = [];
+        let nextIdx = 0;
+        let lastProcId = null;
+
+        const addArrivals = (t) => {
+          while (nextIdx < sorted.length && sorted[nextIdx].arrival <= t) {
+            queue.push(sorted[nextIdx++]);
+          }
+        };
+
+        addArrivals(0);
+        readySnapshots[0] = queue.map(z => ({ id: z.id, rem: z.rem }));
+
+        while (done < n && guard++ < 50000) {
+          addArrivals(now);
+          if (queue.length === 0) {
+            if (nextIdx >= sorted.length) break;
+            const nextAt = sorted[nextIdx].arrival;
+            for (let t = now + 1; t <= nextAt; t++) {
+              addSeg('idle', 'IDLE', t - 1, t);
+              addArrivals(t);
+              readySnapshots[t] = queue.map(z => ({ id: z.id, rem: z.rem }));
+              stepEvents[t] = `CPU IDLE waiting for next arrival.`;
+            }
+            now = nextAt;
+            continue;
+          }
+
+          const proc = queue.shift();
+
+          // Context switch overhead if switching between distinct processes
+          if (lastProcId !== null && lastProcId !== proc.id && overhead > 0) {
+            for (let k = 1; k <= overhead; k++) {
+              const t = now + k;
+              addSeg('cs', 'CS', t - 1, t);
+              addArrivals(t);
+              readySnapshots[t] = [{ id: proc.id, rem: proc.rem }, ...queue.map(z => ({ id: z.id, rem: z.rem }))];
+              stepEvents[t] = `Context switch (${overhead} ms overhead) before dispatching ${proc.id}.`;
+            }
+            now += overhead;
+            addArrivals(now);
+          }
+
+          if (proc.first === null) proc.first = now;
+          const slice = Math.min(quantum, proc.rem);
+
+          for (let k = 1; k <= slice; k++) {
+            const t = now + k;
+            addSeg('process', proc.id, t - 1, t);
+            proc.rem--;
+            addArrivals(t);
+            if (proc.rem === 0) {
+              proc.ct = t;
+              done++;
+            }
+            const willRequeue = (k === slice && proc.rem > 0);
+            const qSnapshot = queue.map(z => ({ id: z.id, rem: z.rem }));
+            if (willRequeue) qSnapshot.push({ id: proc.id, rem: proc.rem });
+            readySnapshots[t] = qSnapshot;
+
+            stepEvents[t] = proc.rem === 0
+              ? `${proc.id} completed execution at t = ${t} ms.`
+              : (willRequeue
+                ? `${proc.id} exhausted quantum (${quantum} ms) and returned to Ready Queue tail.`
+                : `${proc.id} running (${proc.rem} ms remaining).`);
+          }
+
+          now += slice;
+          lastProcId = proc.id;
+          if (proc.rem > 0) queue.push(proc);
+        }
+      } else {
+        // Tick-by-tick simulation for FCFS, SJF (NP), SRTF (P), PRIORITY_NP, PRIORITY_P
+        let activeProc = null;
+        readySnapshots[0] = procs.filter(p => p.arrival === 0).map(z => ({ id: z.id, rem: z.rem }));
+
+        while (done < n && guard++ < 50000) {
+          const available = procs.filter(p => p.arrival <= now && p.rem > 0);
+
+          if (available.length === 0) {
+            addSeg('idle', 'IDLE', now, now + 1);
+            now++;
+            readySnapshots[now] = procs.filter(p => p.arrival <= now && p.rem > 0).map(z => ({ id: z.id, rem: z.rem }));
+            stepEvents[now] = `CPU IDLE at t = ${now - 1}–${now} ms.`;
+            activeProc = null;
+            continue;
+          }
+
+          const isPreemptive = (algo === 'SRTF' || algo === 'PRIORITY_P');
+
+          if (!activeProc || activeProc.rem === 0 || isPreemptive) {
+            const candidates = [...available];
+            if (algo === 'FCFS') {
+              candidates.sort((a, b) => a.arrival - b.arrival || a.order - b.order);
+            } else if (algo === 'SJF' || algo === 'SRTF') {
+              candidates.sort((a, b) => a.rem - b.rem || a.arrival - b.arrival || a.order - b.order);
+            } else if (algo === 'PRIORITY_NP' || algo === 'PRIORITY_P') {
+              candidates.sort(priorityCompare);
+            }
+            const chosen = candidates[0];
+            if (activeProc && activeProc.rem > 0 && activeProc.id !== chosen.id) {
+              stepEvents[now + 1] = `Preemption! ${chosen.id} preempted ${activeProc.id} at t = ${now} ms.`;
+            }
+            activeProc = chosen;
+          }
+
+          if (activeProc.first === null) activeProc.first = now;
+          addSeg('process', activeProc.id, now, now + 1);
+          activeProc.rem--;
+          now++;
+
+          if (activeProc.rem === 0) {
+            activeProc.ct = now;
+            done++;
+            stepEvents[now] = `${activeProc.id} completed at t = ${now} ms.`;
+          } else if (!stepEvents[now]) {
+            stepEvents[now] = `${activeProc.id} running (${activeProc.rem} ms remaining).`;
+          }
+
+          const nextReady = procs
+            .filter(p => p.arrival <= now && p.rem > 0 && p.id !== (activeProc.rem > 0 && !isPreemptive ? activeProc.id : ''))
+            .map(z => ({ id: z.id, rem: z.rem }));
+          readySnapshots[now] = nextReady;
+        }
+      }
+
+      const ordered = procs.map(p => {
+        const tat = p.ct - p.arrival;
+        const wt = tat - p.burst;
+        const rt = p.first - p.arrival;
+        return { ...p, tat, wt, rt };
+      });
+
+      // Count context switches (transitions between distinct processes or CS blocks)
+      const procSegs = segs.filter(s => s.type === 'process');
+      let switches = 0;
+      for (let i = 1; i < procSegs.length; i++) {
+        if (procSegs[i].id !== procSegs[i - 1].id) switches++;
+      }
+
+      return {
+        ordered,
+        segs,
+        finish: now,
+        stepEvents,
+        readySnapshots,
+        switches
+      };
+    }
+
+    function recomputeCpu() {
+      hideBanner();
+      stopCpuPlay();
+
+      const q = parseInt(document.getElementById('cpu-quantum').value, 10) || 2;
+      const oh = parseInt(document.getElementById('cpu-overhead').value, 10) || 0;
+      const pRule = document.getElementById('cpu-priority-rule').value || 'low';
+
+      if (q < 1 || oh < 0) {
+        showBanner('Time quantum must be at least 1 ms and overhead must be 0 or greater.', 'error');
+        return;
+      }
+
+      state.cpu.quantum = q;
+      state.cpu.overhead = oh;
+      state.cpu.priorityRule = pRule;
+      state.cpu.sim = buildCpuSchedule(state.cpu.processes, state.cpu.algo, {
+        quantum: q,
+        overhead: oh,
+        priorityRule: pRule
+      });
+      state.cpu.clock = state.cpu.sim.finish;
+
+      renderCpuSimulation();
+      renderCpuComparisonTables();
+    }
+
+    function cpuReset() {
+      stopCpuPlay();
+      state.cpu.clock = 0;
+      renderCpuSimulation();
+    }
+
+    function cpuStepForward() {
+      if (!state.cpu.sim) return;
+      if (state.cpu.clock < state.cpu.sim.finish) {
+        state.cpu.clock++;
+        renderCpuSimulation();
+      } else {
+        stopCpuPlay();
+      }
+    }
+
+    function cpuStepBack() {
+      stopCpuPlay();
+      if (state.cpu.clock > 0) {
+        state.cpu.clock--;
+        renderCpuSimulation();
+      }
+    }
+
+    function toggleCpuPlay() {
+      if (state.cpu.isPlaying) {
+        stopCpuPlay();
+      } else {
+        if (!state.cpu.sim) recomputeCpu();
+        if (state.cpu.clock >= state.cpu.sim.finish) {
+          state.cpu.clock = 0;
+          renderCpuSimulation();
+        }
+        state.cpu.isPlaying = true;
+        document.getElementById('cpu-play-text').innerHTML = '&#10074;&#10074; Pause';
+        const speedMs = parseInt(document.getElementById('cpu-speed').value, 10) || 600;
+        state.cpu.timerId = setInterval(() => {
+          if (state.cpu.clock < state.cpu.sim.finish) {
+            state.cpu.clock++;
+            renderCpuSimulation();
+          } else {
+            stopCpuPlay();
+          }
+        }, speedMs);
+      }
+    }
+
+    function stopCpuPlay() {
+      state.cpu.isPlaying = false;
+      if (state.cpu.timerId) {
+        clearInterval(state.cpu.timerId);
+        state.cpu.timerId = null;
+      }
+      const txt = document.getElementById('cpu-play-text');
+      if (txt) txt.innerHTML = '&#9654; Play';
+    }
+
+    function getCpuColor(pid) {
+      const idx = state.cpu.processes.findIndex(p => p.id === pid);
+      if (idx === -1) return BLUSH_PROCESS_COLORS[0];
+      return BLUSH_PROCESS_COLORS[idx % BLUSH_PROCESS_COLORS.length];
+    }
+
+    function renderCpuSimulation() {
+      const sim = state.cpu.sim;
+      if (!sim) return;
+
+      const clock = Math.max(0, Math.min(state.cpu.clock, sim.finish));
+      state.cpu.clock = clock;
+
+      const algoNames = {
+        'RR': `Round Robin (q = ${state.cpu.quantum} ms, CS = ${state.cpu.overhead} ms)`,
+        'FCFS': 'First-Come, First-Served (FCFS)',
+        'SJF': 'Shortest Job First (Non-Preemptive)',
+        'SRTF': 'Shortest Remaining Time First (SRTF / SJRF)',
+        'PRIORITY_NP': `Priority Scheduling (Non-Preemptive, ${state.cpu.priorityRule === 'low' ? 'Low # High' : 'High # High'})`,
+        'PRIORITY_P': `Priority Scheduling (Preemptive, ${state.cpu.priorityRule === 'low' ? 'Low # High' : 'High # High'})`
+      };
+
+      document.getElementById('cpu-studio-badge').textContent = state.cpu.algo.replace('_', ' ');
+      document.getElementById('cpu-gantt-title').textContent = `Gantt Chart — ${algoNames[state.cpu.algo]}`;
+      document.getElementById('cpu-clock-display').textContent = clock;
+      document.getElementById('cpu-gantt-clock').textContent = `t = ${clock} ms`;
+      document.getElementById('cpu-total-time-display').textContent = sim.finish;
+
+      // Active segment at [clock, clock+1) or previous interval if at finish
+      const activeSeg = sim.segs.find(s => s.start <= clock && s.end > clock) ||
+                        (clock > 0 ? sim.segs.find(s => s.start < clock && s.end >= clock) : null);
+
+      const cpuEl = document.getElementById('cpu-big-status');
+      const intEl = document.getElementById('cpu-interval-display');
+
+      if (clock === sim.finish) {
+        cpuEl.textContent = 'FINISHED';
+        cpuEl.className = 'text-2xl sm:text-3xl font-black text-[#2f855a]';
+        intEl.textContent = `0–${sim.finish} ms`;
+      } else if (!activeSeg || activeSeg.type === 'idle') {
+        cpuEl.textContent = 'IDLE';
+        cpuEl.className = 'text-2xl sm:text-3xl font-black text-[#b9475a]';
+        intEl.textContent = activeSeg ? `${activeSeg.start}–${activeSeg.end} ms` : '—';
+      } else if (activeSeg.type === 'cs') {
+        cpuEl.textContent = 'CONTEXT SWITCH';
+        cpuEl.className = 'text-xl sm:text-2xl font-black text-[#873d49]';
+        intEl.textContent = `${activeSeg.start}–${activeSeg.end} ms`;
+      } else {
+        cpuEl.textContent = activeSeg.id;
+        cpuEl.className = 'text-2xl sm:text-3xl font-black text-[#c85c66]';
+        intEl.textContent = `${activeSeg.start}–${activeSeg.end} ms`;
+      }
+
+      // Process Status Table with Progress Bars
+      const statusTbody = document.getElementById('cpu-status-tbody');
+      statusTbody.innerHTML = sim.ordered.map(p => {
+        const elapsed = sim.segs
+          .filter(s => s.type === 'process' && s.id === p.id && s.start < clock)
+          .reduce((sum, s) => sum + Math.max(0, Math.min(clock, s.end) - s.start), 0);
+        const rem = Math.max(0, p.burst - elapsed);
+        const complete = clock >= p.ct;
+        const isRunning = activeSeg && activeSeg.type === 'process' && activeSeg.id === p.id && clock < sim.finish;
+        const statusLabel = complete
+          ? 'Completed'
+          : (p.arrival > clock ? 'Not arrived' : (isRunning ? 'Running' : (elapsed > 0 ? 'Ready / Preempted' : 'Ready')));
+        const wtNow = complete ? `${p.wt} ms` : (p.arrival > clock ? '—' : `${Math.max(0, clock - p.arrival - elapsed)} ms`);
+        const pct = Math.min(100, (elapsed / p.burst) * 100);
+
+        return `
+          <tr class="hover:bg-[#fff9f6] transition">
+            <td class="py-2.5 px-3">
+              <div class="font-extrabold text-[#482d32]">${p.name}</div>
+              <div class="text-xs text-[#815f62] font-semibold">${p.id} &middot; ${statusLabel}</div>
+            </td>
+            <td class="py-2.5 px-3 text-center font-mono">${p.arrival}</td>
+            <td class="py-2.5 px-3 text-center font-mono">${p.priority}</td>
+            <td class="py-2.5 px-3">
+              <div class="statusbar mx-auto">
+                <div class="statusfill ${isRunning ? 'current' : ''}" style="width:${pct}%"></div>
+              </div>
+            </td>
+            <td class="py-2.5 px-3 text-right font-mono font-bold">${rem} ms</td>
+            <td class="py-2.5 px-3 text-right font-mono">${wtNow}</td>
+            <td class="py-2.5 px-3 text-right font-mono font-bold text-[#873d49]">${complete ? p.ct + ' ms' : '—'}</td>
+          </tr>
+        `;
+      }).join('');
+
+      // Gantt Chart Blocks & Ticks up to current clock
+      const visibleSegs = [];
+      for (const s of sim.segs) {
+        if (s.start >= clock && clock > 0) break;
+        if (clock === 0) break;
+        const clippedEnd = Math.min(clock, s.end);
+        visibleSegs.push({ ...s, clippedEnd });
+      }
+
+      const ganttEl = document.getElementById('cpu-gantt-bars');
+      const ticksEl = document.getElementById('cpu-gantt-ticks');
+
+      if (visibleSegs.length === 0) {
+        ganttEl.innerHTML = `<div class="px-4 py-4 text-xs text-[#815f62] italic">Press <strong>Play</strong> or <strong>Next ms</strong> to build the Gantt chart...</div>`;
+        ticksEl.innerHTML = '';
+      } else {
+        ganttEl.innerHTML = visibleSegs.map((s, idx) => {
+          const dur = s.clippedEnd - s.start;
+          const widthPx = Math.max(54, dur * 44);
+          const isCurrent = idx === visibleSegs.length - 1 && clock < sim.finish;
+          const color = s.type === 'process' ? getCpuColor(s.id).bg : '';
+          const extraClass = s.type === 'cs' ? 'cs' : (s.type === 'idle' ? 'idle' : '');
+          return `
+            <div class="gseg ${extraClass} ${isCurrent ? 'active' : ''}"
+                 style="width:${widthPx}px; ${color ? 'background:' + color + ';' : ''}"
+                 title="${s.id}: ${s.start}–${s.clippedEnd} ms">
+              <span class="text-xs sm:text-sm">${s.id}</span>
+              <span class="text-[10px] font-mono opacity-90">${dur} ms</span>
+            </div>
+          `;
+        }).join('');
+
+        ticksEl.innerHTML = visibleSegs.map(s => {
+          const dur = s.clippedEnd - s.start;
+          const widthPx = Math.max(54, dur * 44);
+          return `<div style="width:${widthPx}px;" class="px-1">${s.start}&rarr;${s.clippedEnd}</div>`;
+        }).join('');
+      }
+
+      // Ready Queue Snapshot
+      const rqList = sim.readySnapshots[clock] || [];
+      const rqEl = document.getElementById('cpu-ready-queue');
+      if (rqList.length === 0) {
+        rqEl.innerHTML = `<span class="text-xs text-[#815f62] italic">Ready queue is empty at t = ${clock} ms.</span>`;
+      } else {
+        rqEl.innerHTML = rqList.map(item => `
+          <span class="qitem">${item.id} <small class="font-mono font-semibold opacity-80">(${item.rem} ms left)</small></span>
+        `).join('');
+      }
+
+      // Step Event Narration
+      document.getElementById('cpu-step-narration').textContent =
+        clock === 0
+          ? 'Simulation ready at t = 0 ms. Press Play or Next ms to begin.'
+          : (sim.stepEvents[clock] || (clock >= sim.finish ? 'All processes completed.' : 'CPU state updated.'));
+
+      // Live Statistics Cards
+      const completedProcs = sim.ordered.filter(p => p.ct <= clock);
+      document.getElementById('cpu-done-count').textContent = `${completedProcs.length} / ${sim.ordered.length}`;
+      document.getElementById('cpu-switch-count').textContent = sim.switches;
+
+      if (completedProcs.length > 0) {
+        const avgWT = completedProcs.reduce((a, p) => a + p.wt, 0) / completedProcs.length;
+        const avgTAT = completedProcs.reduce((a, p) => a + p.tat, 0) / completedProcs.length;
+        const avgRT = completedProcs.reduce((a, p) => a + p.rt, 0) / completedProcs.length;
+        document.getElementById('cpu-avg-wt').textContent = `${avgWT.toFixed(2)} ms`;
+        document.getElementById('cpu-avg-tat').textContent = `${avgTAT.toFixed(2)} ms`;
+        document.getElementById('cpu-avg-rt').textContent = `${avgRT.toFixed(2)} ms`;
+      } else {
+        document.getElementById('cpu-avg-wt').textContent = '—';
+        document.getElementById('cpu-avg-tat').textContent = '—';
+        document.getElementById('cpu-avg-rt').textContent = '—';
+      }
+
+      const busyTime = sim.segs.filter(s => s.type === 'process').reduce((a, s) => a + (s.end - s.start), 0);
+      const eff = sim.finish > 0 ? (100 * busyTime) / sim.finish : 0;
+      document.getElementById('cpu-efficiency').textContent = `${eff.toFixed(1)}%`;
+
+      document.getElementById('cpu-prev-btn').disabled = clock === 0;
+      document.getElementById('cpu-next-btn').disabled = clock >= sim.finish;
+    }
+
+    function renderCpuComparisonTables() {
+      const sim = state.cpu.sim;
+      if (!sim) return;
+
+      // 1. Complete Results Table
+      const completeBody = document.getElementById('cpu-complete-tbody');
+      completeBody.innerHTML = sim.ordered.map(p => `
+        <tr class="hover:bg-[#fff9f6] transition">
+          <td class="py-2.5 px-3 font-bold text-[#482d32]">${p.name}</td>
+          <td class="py-2.5 px-3 text-center font-mono font-extrabold text-[#873d49]">${p.id}</td>
+          <td class="py-2.5 px-3 text-center font-mono">${p.arrival}</td>
+          <td class="py-2.5 px-3 text-center font-mono">${p.burst}</td>
+          <td class="py-2.5 px-3 text-center font-mono">${p.priority}</td>
+          <td class="py-2.5 px-3 text-center font-mono font-bold">${p.ct}</td>
+          <td class="py-2.5 px-3 text-center font-mono font-bold text-[#276749]">${p.tat}</td>
+          <td class="py-2.5 px-3 text-center font-mono font-bold text-[#c85c66]">${p.wt}</td>
+          <td class="py-2.5 px-3 text-center font-mono font-bold text-[#683d43]">${p.rt}</td>
+        </tr>
+      `).join('');
+
+      const n = sim.ordered.length;
+      const avgWT = sim.ordered.reduce((a, p) => a + p.wt, 0) / n;
+      const avgTAT = sim.ordered.reduce((a, p) => a + p.tat, 0) / n;
+      const avgRT = sim.ordered.reduce((a, p) => a + p.rt, 0) / n;
+      const csOverheadTotal = sim.segs.filter(s => s.type === 'cs').reduce((a, s) => a + (s.end - s.start), 0);
+      const totalBurst = sim.ordered.reduce((a, p) => a + p.burst, 0);
+      const eff = sim.finish > 0 ? (100 * totalBurst) / sim.finish : 0;
+
+      document.getElementById('cpu-assignment-summary').textContent =
+        `Average WT: ${avgWT.toFixed(2)} ms · Average TAT: ${avgTAT.toFixed(2)} ms · Average RT: ${avgRT.toFixed(2)} ms · Context switches: ${sim.switches} · Context-switch overhead: ${csOverheadTotal} ms · CPU efficiency: ${eff.toFixed(2)}%.`;
+
+      // 2. Round Robin Assignment Quantum Comparison Table (Activity 1: q=2 vs 3; Activity 2: q=2 vs 4 with 1ms CS)
+      const scenario = document.getElementById('cpu-scenario').value;
+      const quantaToCompare = scenario === 'a2' ? [2, 4] : [2, 3];
+      const compareOverhead = scenario === 'a2' ? 1 : state.cpu.overhead;
+
+      document.getElementById('cpu-quantum-comparison-tbody').innerHTML = quantaToCompare.map(qVal => {
+        const z = buildCpuSchedule(state.cpu.processes, 'RR', { quantum: qVal, overhead: compareOverhead });
+        const zn = z.ordered.length;
+        const w = z.ordered.reduce((a, p) => a + p.wt, 0) / zn;
+        const t = z.ordered.reduce((a, p) => a + p.tat, 0) / zn;
+        const r = z.ordered.reduce((a, p) => a + p.rt, 0) / zn;
+        const ov = z.segs.filter(s => s.type === 'cs').reduce((a, s) => a + (s.end - s.start), 0);
+        const bt = z.ordered.reduce((a, p) => a + p.burst, 0);
+        const ef = z.finish > 0 ? (100 * bt) / z.finish : 0;
+        return `
+          <tr class="hover:bg-[#fff9f6]">
+            <td class="py-2.5 px-3 text-center font-mono font-extrabold text-[#873d49]">${qVal} ms</td>
+            <td class="py-2.5 px-3 text-center font-mono">${w.toFixed(2)}</td>
+            <td class="py-2.5 px-3 text-center font-mono">${t.toFixed(2)}</td>
+            <td class="py-2.5 px-3 text-center font-mono">${r.toFixed(2)}</td>
+            <td class="py-2.5 px-3 text-center font-mono">${z.switches}</td>
+            <td class="py-2.5 px-3 text-center font-mono">${ov} ms</td>
+            <td class="py-2.5 px-3 text-center font-mono font-bold text-[#276749]">${ef.toFixed(2)}%</td>
+          </tr>
+        `;
+      }).join('');
+
+      // 3. All 6 CPU Algorithms Comparison Table
+      const cpuAlgoList = [
+        { key: 'FCFS', label: 'FCFS (Non-Preemptive)' },
+        { key: 'SJF', label: 'SJF (Non-Preemptive)' },
+        { key: 'SRTF', label: 'SRTF / SJRF (Preemptive)' },
+        { key: 'PRIORITY_NP', label: 'Priority (Non-Preemptive)' },
+        { key: 'PRIORITY_P', label: 'Priority (Preemptive)' },
+        { key: 'RR', label: `Round Robin (q = ${state.cpu.quantum} ms)` }
+      ];
+
+      document.getElementById('cpu-all-algos-tbody').innerHTML = cpuAlgoList.map(item => {
+        const res = buildCpuSchedule(state.cpu.processes, item.key, {
+          quantum: state.cpu.quantum,
+          overhead: state.cpu.overhead,
+          priorityRule: state.cpu.priorityRule
+        });
+        const rn = res.ordered.length;
+        const w = res.ordered.reduce((a, p) => a + p.wt, 0) / rn;
+        const t = res.ordered.reduce((a, p) => a + p.tat, 0) / rn;
+        const r = res.ordered.reduce((a, p) => a + p.rt, 0) / rn;
+        const isCurrent = item.key === state.cpu.algo;
+        return `
+          <tr class="${isCurrent ? 'bg-[#ffe5dc]/75' : 'hover:bg-[#fff9f6]'} transition">
+            <td class="py-2.5 px-3 font-extrabold text-[#482d32]">${item.label}</td>
+            <td class="py-2.5 px-3 text-right font-mono font-bold text-[#c85c66]">${w.toFixed(2)}</td>
+            <td class="py-2.5 px-3 text-right font-mono font-bold text-[#276749]">${t.toFixed(2)}</td>
+            <td class="py-2.5 px-3 text-right font-mono">${r.toFixed(2)}</td>
+            <td class="py-2.5 px-3 text-right font-mono">${res.switches}</td>
+            <td class="py-2.5 px-3 text-right">
+              <button onclick="selectCpuAlgo('${item.key}')" class="text-xs font-extrabold text-[#c85c66] hover:text-[#873d49] underline">
+                ${isCurrent ? 'Viewing' : 'Animate'}
+              </button>
+            </td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    // =========================================================================
+    // 5. EVENT LISTENERS & INITIALIZATION
+    // =========================================================================
+    document.getElementById('disk-speed').addEventListener('input', (e) => {
+      const labels = { 1: '0.5x', 2: '0.75x', 3: '1.0x', 4: '1.5x', 5: '2.0x' };
+      document.getElementById('disk-speed-label').textContent = labels[e.target.value] || '1.0x';
+      if (state.disk.isPlaying) {
+        stopDiskPlay();
+        toggleDiskPlay();
+      }
+    });
+
+    document.getElementById('cpu-speed').addEventListener('change', () => {
+      if (state.cpu.isPlaying) {
+        stopCpuPlay();
+        toggleCpuPlay();
+      }
+    });
+
+    window.addEventListener('resize', () => {
+      if (state.activeTab === 'disk') {
+        renderDiskCanvas();
+        renderDiskBarChart();
+      }
+    });
+
+    window.onload = function () {
+      recomputeDisk();
+      renderCpuProcessCards();
+      recomputeCpu();
+    };
+  </script>
+</body>
+</html>
