@@ -41,15 +41,12 @@ os_visualizer_disk_cpu_scheduling/
 ├── index.html             # Complete self-contained interactive visualizer (Part A & Part B)
 ├── analysis_report.pdf    # Part C: Comparative performance, starvation & SDG 7/9 energy report
 ├── README.md              # Setup instructions, sample test inputs, and screenshots
-└── Screenshots/           # Application screenshots for documentation
-    ├── cpu_fcfs_1.png
-    ├── cpu_fcfs_2.png
-    ├── disk_fcfs_1.png
-    ├── disk_fcfs_2.png
-    ├── disk_sstf_1.png
-    └── disk_sstf_2.png
-```
-
+├── cpu_fcfs_1.png         # Screenshot: FCFS CPU scheduling (View 1)
+├── cpu_fcfs_2.png         # Screenshot: FCFS CPU scheduling (View 2)
+├── disk_fcfs_1.png        # Screenshot: FCFS disk scheduling (View 1)
+├── disk_fcfs_2.png        # Screenshot: FCFS disk scheduling (View 2)
+├── disk_sstf_1.png        # Screenshot: SSTF disk scheduling (View 1)
+└── disk_sstf_2.png        # Screenshot: SSTF disk scheduling (View 2)
 ---
 
 ## Setup & Running Locally
@@ -110,26 +107,26 @@ No build tools, Node.js packages, or backend servers are required.
 ### Part A: Disk Scheduling
 
 #### 1. FCFS (First-Come, First-Served) — Seek Graph & Controls
-![FCFS Disk View 1](Screenshots/disk_fcfs_1.png)
+![FCFS Disk View 1](disk_fcfs_1.png)
 
 #### 2. FCFS (First-Come, First-Served) — All-Algorithm Comparison
-![FCFS Disk View 2](Screenshots/disk_fcfs_2.png)
+![FCFS Disk View 2](disk_fcfs_2.png)
 
 #### 3. SSTF (Shortest Seek Time First) — Seek Graph & Narration
-![SSTF Disk View 1](Screenshots/disk_sstf_1.png)
+![SSTF Disk View 1](disk_sstf_1.png)
 
 #### 4. SSTF (Shortest Seek Time First) — Comparison Bar Chart
-![SSTF Disk View 2](Screenshots/disk_sstf_2.png)
+![SSTF Disk View 2](disk_sstf_2.png)
 
 ---
 
 ### Part B: CPU Scheduling
 
 #### 1. FCFS CPU Scheduling — Process Status & Gantt Chart
-![FCFS CPU View 1](Screenshots/cpu_fcfs_1.png)
+![FCFS CPU View 1](cpu_fcfs_1.png)
 
 #### 2. FCFS CPU Scheduling — Complete Metrics & Comparison
-![FCFS CPU View 2](Screenshots/cpu_fcfs_2.png)
+![FCFS CPU View 2](cpu_fcfs_2.png)
 
 ---
 
